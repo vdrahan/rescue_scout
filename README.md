@@ -1,8 +1,8 @@
-# Project Title
+# RC CAR search-and-rescue system 
 
-**FIRST & LAST NAME:** A B
+**FIRST & LAST NAME:** Vladyslav Drahan
 
-**Sparring Partner:** C D
+**Sparring Partner:** Vsevolod Bereza
 
 **Project Summary in max 10 words:** E
 
