@@ -85,9 +85,9 @@ Fill in every table below, just like you did with the real PD.
 | **Aesthetics**       | Material: ABS enclosure (3 mm); Colors: Red and Yellow; Labels: All of the labels will locate under the LEDs indicating its role. The labels will be engraved useing laser-cutter         |
 
 
-[Enclosure](PD_Images/Enclosure.png)
+![Enclosure](PD_Images/Enclosure.png)
 
-[Painted_Enclosure](PD_Images/Enclosure_Painted.png)
+![Painted_Enclosure](PD_Images/Enclosure_Painted.png)
 ---
 
 ## 5. Software & visualisation
