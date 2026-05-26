@@ -195,7 +195,7 @@ def build_dashboard(ctx: AppContext) -> tuple[gr.Blocks, InferenceHandlers]:
 
     ctx.gpio = start_gpio(
         ctx.cfg,
-        on_short_press=None, # TODO: run inference on short_press,
+        on_short_press=inference.on_gpio_short_press,
         on_hold_press=inference.shutdown_now,
     )
     return demo, inference

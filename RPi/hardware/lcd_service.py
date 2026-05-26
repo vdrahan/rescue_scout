@@ -34,8 +34,24 @@ class I2CLCD:
         self._init_lcd()
 
     def _init_lcd(self) -> None:
-        # TODO: initialize LCD
-        pass
+        time.sleep(0.05)
+
+        self._toggle_enable(0x30)
+        time.sleep(0.005)
+        self._toggle_enable(0x30)
+        time.sleep(0.005)
+        
+        self._toggle_enable(0x20)
+        time.sleep(0.005)
+
+        self._send_byte(0x28, self.LCD_CMD)
+        
+        self._send_byte(0x0C, self.LCD_CMD)
+
+        self._send_byte(0x01, self.LCD_CMD)
+        time.sleep(0.005)
+        
+        self._send_byte(0x06, self.LCD_CMD)
 
     def _toggle_enable(self, bits: int) -> None:
         time.sleep(self.E_DELAY)
@@ -59,8 +75,12 @@ class I2CLCD:
         time.sleep(0.002)
 
     def message(self, text: str, line: int) -> None:
-        # TODO: send message to LCD (multiple lines)
-        pass
+        self.send_command(line)
+        message = str(text)
+        message = message.ljust(self.width, " ")
+
+        for ch in message[:self.width]:
+            self._send_byte(ord(ch), self.LCD_CHR)
 
 
 class LCDService:
@@ -97,8 +117,8 @@ class LCDService:
         if not force and (now - self._last_update_ts) < self.min_update_interval:
             return
         with self._lock:
-            self._lcd.message(self._normalize(line1), line=1)
-            self._lcd.message(self._normalize(line2), line=2)
+            self._lcd.message(self._normalize(line1), line=self._lcd.LINE_1)
+            self._lcd.message(self._normalize(line2), line=self._lcd.LINE_2)
             self._last_update_ts = time.time()
 
     def show_startup_ip(self, lan_ip: str, wifi_ip: str) -> None:

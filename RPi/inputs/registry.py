@@ -18,7 +18,6 @@ INPUT_BROWSER_WEBCAM = "browser_webcam"
 
 INPUT_OPTIONS = (
     INPUT_RPI_CAMERA,
-    INPUT_CSI_CAMERA,
     INPUT_UPLOAD,
     INPUT_BROWSER_WEBCAM,
 )
@@ -68,13 +67,11 @@ def rpi_panel_visibility(yolo_source: str, pose_source: str) -> bool:
 # ---------------------------------------------------------------------------
 def build_input_providers(cfg: AppConfig) -> dict[str, InputProvider]:
     from .browser_webcam import BrowserWebcamInput
-    from .csi_camera import CsiCameraInput
     from .upload import UploadInput
     from .usb_camera import UsbCameraInput
 
     return {
         INPUT_RPI_CAMERA: UsbCameraInput(cfg.camera_device, cfg.camera_index),
-        INPUT_CSI_CAMERA: CsiCameraInput(cfg.csi_buffer_resolution, cfg.csi_bgr_to_rgb),
         INPUT_UPLOAD: UploadInput(),
         INPUT_BROWSER_WEBCAM: BrowserWebcamInput(),
     }
@@ -82,13 +79,11 @@ def build_input_providers(cfg: AppConfig) -> dict[str, InputProvider]:
 
 def input_radio_choices() -> list[tuple[str, str]]:
     from .browser_webcam import BrowserWebcamInput
-    from .csi_camera import CsiCameraInput
     from .upload import UploadInput
     from .usb_camera import UsbCameraInput
 
     return [
         (UsbCameraInput.meta.label, INPUT_RPI_CAMERA),
-        (CsiCameraInput.meta.label, INPUT_CSI_CAMERA),
         (UploadInput.meta.label, INPUT_UPLOAD),
         (BrowserWebcamInput.meta.label, INPUT_BROWSER_WEBCAM),
     ]

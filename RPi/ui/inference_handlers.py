@@ -137,6 +137,7 @@ class InferenceHandlers:
         iou: float,
         ai_history: list[dict[str, Any]],
         error_history: list[dict[str, Any]],
+        
     ):
         try:
             src_rgb = pick_source_frame(
@@ -149,8 +150,11 @@ class InferenceHandlers:
             result = self._ctx.models[MODEL_YOLO].run(src_rgb, conf=conf, iou=iou)
             det_count = int(result.payload.get("detection_count", 0))
             counts = result.payload.get("counts", {})
+
             drone_count = int(counts.get("Drone", 0)) if isinstance(counts, dict) else 0
-            self._ctx.lcd.show_result(f"dets: {det_count}")
+            worker_count = int(counts.get("Worker", 0)) if isinstance(counts, dict) else 0
+            bee_count = drone_count + worker_count
+            self._ctx.lcd.show_result(f"Bees: {bee_count}")
             # Extend hardware feedback here (after you wire it in bootstrap/setup):
             #   self._ctx.buzzer.play("success")  # hardware/buzzer.py
             #   self._ctx.segment.set_number(drone_count)  # hardware/seven_segment.py
