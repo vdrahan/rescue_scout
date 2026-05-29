@@ -9,3 +9,4 @@ rpi-lgpio
 smbus2
 ultralytics
 opencv-python-headless
+opencv-python
