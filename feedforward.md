@@ -66,3 +66,16 @@ This is the feedback on my questions.
 
 - Feedback 1: The night camera mode is worth implementing because it would be an impressive and useful addition to the system.
 
+
+
+## Conversation 3 (Date: 29/05/2026)
+
+Lecturer: Tijn VERAGHTERT
+
+Questions for this conversation:
+
+- Question 1: Is the updated version of the camera module printable?
+
+This is the feedback on my questions.
+
+- Feedback 1: The new updated version is almost production-ready. The position of the mounting holes and the overall dimensions are correct. However, a few small adjustments are still needed: 1. Make the mounting side smaller so the slope angle can be reduced. 2. Make the space for the camera stick slightly wider and adjust the wall thickness accordingly.
