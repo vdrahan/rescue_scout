@@ -79,3 +79,68 @@ Questions for this conversation:
 This is the feedback on my questions.
 
 - Feedback 1: The new updated version is almost production-ready. The position of the mounting holes and the overall dimensions are correct. However, a few small adjustments are still needed: 1. Make the mounting side smaller so the slope angle can be reduced. 2. Make the space for the camera stick slightly wider and adjust the wall thickness accordingly.
+
+## MVP1 (Date: 02/06/2026)
+
+Lecturer: Marie Dewitte, Frederiek Berthier, Christophe Laprudence, Dieter Roobrouck
+
+* **Model & Dataset Feedback:**
+
+    1. Indoor performance
+
+        The model performance is not stable when detecting different people indoors. This is likely because the dataset was collected mostly outdoors and contains many images of the same people wearing similar clothes. To improve the model, more data should be collected with different people, different clothing, and different environments, including indoor locations.
+
+    2. Class imbalance
+
+        The dataset is strongly imbalanced, especially for the crawling_person class. To fix this, more samples should be collected for the underrepresented classes.
+
+    3. Model choice
+
+        The current model choice should be reconsidered. It may be better to switch to a newer YOLO version - YOLOv26, it is better optimized for working on a Raspberry Pi.
+     
+
+* **UI Design Feedback :**
+    1. 
+        The current UI design does not look very professional. The theme should be less colorful and more consistent, with a cleaner and more balanced visual style.
+    2. 
+        Use Buttons instead of scrolling, it will make the usage of touchscreen display more convenient 
+
+## Conversation 4 (Date: 04/06/2026)
+
+Lecturer: Tijn VERAGHTERT
+
+Questions for this conversation:
+
+- Question 1: Does nameplate file require any adjustments?
+
+This is the feedback on my questions.
+
+- Feedback 1: Only minor adjustments to the line colors are needed. Once this is done, the nameplate can be approved for laser cutting, it has a GO.
+
+## Conversation 4 (Date: 04/06/2026)
+
+Lecturer: Pieter-Jan BEECKMAN
+
+Questions for this conversation:
+
+- Question 1: How the hardware should be assembled ?
+
+This is the feedback on my questions.
+
+**Feedback:**
+
+1. LEDs
+
+    The LEDs should be connected to the Raspberry Pi using GPIO and GND pins. Each LED should have a resistor connected in series on the GPIO side to limit the current.
+
+2. Gas sensor
+
+    The gas sensor should use two 1kΩ resistors as a voltage divider. The signal wire should be connected between the two resistors. The second resistor should then be connected to GND, and this GND should go back to the Raspberry Pi.
+
+3. Active buzzer
+
+    The positive wire of the active buzzer should be connected to a GPIO pin, and the negative wire should be connected to GND.
+
+4. RGB LED module, DHT11, and LCD
+
+    The RGB LED module, DHT11 sensor, and LCD can be connected directly to the Raspberry Pi using their required power, ground, signal, and communication pins.

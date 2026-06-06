@@ -1,3 +1,4 @@
+
 .lgd-nfy0
 
 # Byte-compiled / optimized / DLL files
@@ -220,3 +221,15 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Ignored project runs folder
+Backend/runs/
+
+
+# YOLO / model weight files
+# Ignore common model weight and export formats
+*.pt
+*.onnx
+*.tflite
+*.h5
+*.pb

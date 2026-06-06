@@ -52,13 +52,13 @@ Fill in every table below, just like you did with the real PD.
 
 | Project type           | Your choice & model                                                          |
 | ---------------------- | ---------------------------------------------------------------------------- |
-| **Vision**             | Recent **YOLO** model trained in Python — model name/version: YOLO11s                |
+| **Vision**             | Recent **YOLO** model trained in Python — model name/version: YOLOv26                |
 | **Keypoint detection** | Pretrained **MediaPipe** (or similar) → custom classifier on top — describe: |
 | **Non-visual**         | Model / approach:                                                            |
 
 | Topic                    | Your answer                                                              |
 | ------------------------ | ------------------------------------------------------------------------ |
-| **Model information**    | YOLO11s — Input size: 640×640; Weights stored in `RPi/ai/best.pt`; Export format: PyTorch `.pt` |
+| **Model information**    | YOLOv26 — Input size: 640×640; Weights stored in `RPi/ai/best.pt`; Export format: PyTorch `.pt` |
 | **Training environment** | [✅] Laptop [ ] RPi [ ] Cloud — details: Trained on laptop using Python/YOLOv11, then transferred to RPi |
 | **Export to RPi**        | The trained model (e.g.`best.pt`) is exported from the laptop and uploaded to GitHub. During deployment, it is pulled into the needed directory and loaded.                   |
 
