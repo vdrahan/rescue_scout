@@ -223,8 +223,8 @@ __marimo__/
 .streamlit/secrets.toml
 
 # Ignored project runs folder
-Backend/runs/
-
+*runs/
+*data/
 
 # YOLO / model weight files
 # Ignore common model weight and export formats

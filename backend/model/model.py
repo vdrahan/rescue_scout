@@ -10,12 +10,27 @@ import PIL.Image as Image
 import gradio as gr
 
 
-backend_path = Path(__file__).parent
-data_yaml = r"D:\Project One\data\data.yaml"
-model_name = "rescue_person_detection_final"
-start_model = backend_path / "yolo11n.pt"
-trained_model = backend_path / "runs" / "detect" / model_name / "weights" / "best.pt"
-default_rtsp_url = "rtsp://Stickk:12345678@172.20.10.6:554/stream1"
+model_path = Path(__file__).parent
+backend_path = model_path.parent
+model_name = "rescue_person_detection_yolo26n"
+
+
+def get_path_from_env(name, default_path):
+    value = os.getenv(name)
+    if value:
+        return Path(value).expanduser()
+    return Path(default_path)
+
+
+data_yaml = get_path_from_env("DATA_YAML", backend_path / "data" / "data.yaml")
+start_model = os.getenv("START_MODEL_PATH", "yolo26n.pt")
+trained_model = get_path_from_env(
+    "MODEL_PATH",
+    backend_path / "model" / "runs" / "detect" / model_name / "weights" / "best.pt"
+)
+
+default_rtsp_url = os.getenv("RTSP_CAMERA_1_URL", "rtsp://Stickk:12345678@172.20.10.6:554/stream1")
+auto_train_model = os.getenv("AUTO_TRAIN_MODEL", "false").lower() in {"1", "true", "yes", "on"}
 
 device = 0 if torch.cuda.is_available() else "cpu"
 use_half = torch.cuda.is_available()
@@ -35,18 +50,25 @@ def get_model():
         print("Trained model found. Loading it...")
         return YOLO(str(trained_model))
 
+    if not auto_train_model:
+        print("Trained model not found. Loading starter model from Ultralytics.")
+        return YOLO(str(start_model))
+
     print("Trained model not found. Training new model...")
+
+    if not data_yaml.exists():
+        raise FileNotFoundError(f"DATA_YAML does not exist: {data_yaml}")
 
     yolo_model = YOLO(str(start_model))
     yolo_model.train(
         data=data_yaml,
         epochs=30,
         imgsz=640,
-        batch=-1,
+        batch=8,
         patience=6,
         device=device,
-        workers=4,
-        cache=True,
+        workers=2,
+        cache=False,
         plots=True,
         verbose=True,
         pretrained=True,
@@ -74,7 +96,6 @@ def predict_image(img, conf_threshold, iou_threshold):
         show_labels=True,
         show_conf=True,
         imgsz=640,
-        agnostic_nms=True,
         device=device
     )
 
@@ -131,7 +152,7 @@ def main():
     model = get_model()
 
     with gr.Blocks() as iface:
-        gr.Markdown("# Search and Rescue YOLOv11")
+        gr.Markdown("# Search and Rescue YOLOv26n Demo")
 
         with gr.Tab("Image"):
             image_input = gr.Image(type="pil", label="Upload Image")
@@ -160,7 +181,11 @@ def main():
                 outputs=[camera_output, camera_status]
             )
 
-    iface.launch(theme=gr.themes.Monochrome())
+    iface.launch(
+        theme=gr.themes.Monochrome(),
+        server_name=os.getenv("GRADIO_SERVER_NAME", "127.0.0.1"),
+        server_port=int(os.getenv("GRADIO_SERVER_PORT", "7860")),
+    )
 
 
 if __name__ == "__main__":
