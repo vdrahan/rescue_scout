@@ -105,19 +105,8 @@ Lecturer: Marie Dewitte, Frederiek Berthier, Christophe Laprudence, Dieter Roobr
     2. 
         Use Buttons instead of scrolling, it will make the usage of touchscreen display more convenient 
 
-## Conversation 4 (Date: 04/06/2026)
 
-Lecturer: Tijn VERAGHTERT
-
-Questions for this conversation:
-
-- Question 1: Does nameplate file require any adjustments?
-
-This is the feedback on my questions.
-
-- Feedback 1: Only minor adjustments to the line colors are needed. Once this is done, the nameplate can be approved for laser cutting, it has a GO.
-
-## Conversation 4 (Date: 04/06/2026)
+## Conversation 4 (Date: 03/06/2026)
 
 Lecturer: Pieter-Jan BEECKMAN
 
@@ -128,7 +117,7 @@ Questions for this conversation:
 This is the feedback on my questions.
 
 **Feedback:**
-
+  
 1. LEDs
 
     The LEDs should be connected to the Raspberry Pi using GPIO and GND pins. Each LED should have a resistor connected in series on the GPIO side to limit the current.
@@ -144,3 +133,52 @@ This is the feedback on my questions.
 4. RGB LED module, DHT11, and LCD
 
     The RGB LED module, DHT11 sensor, and LCD can be connected directly to the Raspberry Pi using their required power, ground, signal, and communication pins.
+
+
+## Conversation 5 (Date: 04/06/2026)
+
+Lecturer: Tijn VERAGHTERT
+
+Questions for this conversation:
+
+- Question 1: Does nameplate file require any adjustments?
+
+This is the feedback on my questions.
+
+- Feedback 1: Only minor adjustments to the line colors are needed. Once this is done, the nameplate can be approved for laser cutting, it has a GO.
+
+
+## MVP2 (Date: 09/06/2026)
+
+Lecturer: Claudia EECKHOUT, Pieter-Jan BEECKMAN, Paula ACUÑA RONCANCIO
+
+* **Model & Dataset Feedback:**
+
+    1. Misclassification and missed detections
+
+        The model still shows unstable detection performance. It sometimes assigns the wrong class to a person or fails to detect the person completely.
+
+    2. Class imbalance
+
+        The dataset is still imbalanced, which causes the model to perform better on majority classes and worse on minority classes. To improve this, more samples should be collected for the underrepresented classes.
+    
+    3. Reducing false negatives
+        
+        Further tuning is needed to reduce false negatives, since the system should prioritize detecting a person over avoiding false alarms.
+
+    4. Dataset diversity
+        
+        The dataset should be expanded with images of people with different appearances, including skin color, gender, height, body type, clothing, and poses.
+
+
+* **Gradio:**
+
+    1. Debugging Page
+
+        A debugging page should be implemented to monitor the system status and verify that each connected component is working correctly.
+
+* **General recommendation:**
+
+    1. Train before presenting
+
+        Before the Tourmoment, it is useful to practise pronunciation and rehearse the product pitch to make sure the concept, features, and purpose of the product can be explained clearly.
