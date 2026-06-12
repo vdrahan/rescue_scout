@@ -44,6 +44,7 @@ services:
       DATA_YAML: ${DATA_YAML:-/app/model/data/data.yaml}
       AUTO_TRAIN_MODEL: ${AUTO_TRAIN_MODEL:-false}
       RTSP_CAMERA_1_URL: ${RTSP_CAMERA_1_URL:-}
+      API_URL: http://api:${API_PORT:-8000}
     ports:
       - "${FRONTEND_PORT:-7860}:${FRONTEND_PORT:-7860}"
     depends_on:

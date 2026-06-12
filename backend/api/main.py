@@ -1,51 +1,32 @@
-from contextlib import contextmanager
-import os
-from typing import Any, Iterator
+from __future__ import annotations
 
-import psycopg2
+from typing import Any
+
 from fastapi import FastAPI
 
+from database import db
+from routers import detections, events, sensors, statistics
 
-app = FastAPI(title="Search and Rescue API", version="0.1.0")
+app = FastAPI(title="Search and Rescue API", version="1.0.0")
 
-
-def get_database_url() -> str:
-    database_url = os.getenv("DATABASE_URL", "").strip()
-    if not database_url:
-        raise RuntimeError("DATABASE_URL is not configured")
-    return database_url
-
-
-@contextmanager
-def db_connection() -> Iterator[Any]:
-    connection = psycopg2.connect(get_database_url())
-    try:
-        yield connection
-    finally:
-        connection.close()
+app.include_router(detections.router)
+app.include_router(sensors.router)
+app.include_router(events.router)
+app.include_router(statistics.router)
 
 
-@app.get("/health")
+@app.get("/health", tags=["health"])
 def health() -> dict[str, str]:
     return {"status": "ok", "service": "api"}
 
 
-@app.get("/db-health")
+@app.get("/db-health", tags=["health"])
 def db_health() -> dict[str, Any]:
     try:
-        with db_connection() as connection:
-            with connection.cursor() as cursor:
-                cursor.execute("SELECT 1;")
-                result = cursor.fetchone()
-
-        return {
-            "status": "ok",
-            "database": "connected",
-            "check": result[0] if result else None,
-        }
-    except Exception as error:
-        return {
-            "status": "error",
-            "database": "disconnected",
-            "detail": str(error),
-        }
+        with db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1;")
+                row = cur.fetchone()
+        return {"status": "ok", "database": "connected", "check": row[0] if row else None}
+    except Exception as exc:
+        return {"status": "error", "database": "disconnected", "detail": str(exc)}

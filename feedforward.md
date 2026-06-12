@@ -182,3 +182,24 @@ Lecturer: Claudia EECKHOUT, Pieter-Jan BEECKMAN, Paula ACUÑA RONCANCIO
     1. Train before presenting
 
         Before the Tourmoment, it is useful to practise pronunciation and rehearse the product pitch to make sure the concept, features, and purpose of the product can be explained clearly.
+
+## Conversation 6 (Date: 04/06/2026)
+
+Lecturer: Geert DESLOOVERE
+
+Questions for this conversation:
+
+- Question 1: How to connect the MQ-2 gas sensor to the Raspberry Pi?
+
+This is the feedback on my questions.
+
+- Feedback 1: To connect the MQ-2 sensor to the Raspberry Pi, an ADC converter is required because the Raspberry Pi cannot read analog signals directly.
+
+The A0 pin of the MQ-2 sensor should be connected to the analog input pin of the ADC.
+
+From the ADC, the connections should be made as follows:
+
+- VCC connects to the 5V power pin on the Raspberry Pi.
+- SDA connects to the Raspberry Pi SDA pin.
+- SCL connects to the Raspberry Pi SCL pin.
+- GND connects to the GND of the MQ-2 sensor and then to a GND pin on the Raspberry Pi.
