@@ -233,3 +233,8 @@ __marimo__/
 *.tflite
 *.h5
 *.pb
+
+graphify-out/
+PRODUCT.md
+DESIGN.md
+.superpowers/
