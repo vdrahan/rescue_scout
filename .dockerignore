@@ -25,6 +25,15 @@ PD_Images/
 *.ipynb
 *.zip
 
+# Reference / docs / tooling not needed in any image
+examples/
+docs/
+.superpowers/
+graphify-out/
+tests/
+*.md
+.venv-station/
+
 runs/
 datasets/
 training/

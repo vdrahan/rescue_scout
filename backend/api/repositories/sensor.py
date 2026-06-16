@@ -9,6 +9,20 @@ from database import db
 
 
 
+def get_sensors() -> list[dict[str, Any]]:
+    with db() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT sensor_id, sensor_name, unit, min_value, max_value,
+                       description, is_active, danger_level
+                FROM sensor
+                ORDER BY sensor_id;
+                """
+            )
+            return [dict(r) for r in cur.fetchall()]
+
+
 def get_readings(
     sensor_id: int | None,
     sensor_name: str | None,

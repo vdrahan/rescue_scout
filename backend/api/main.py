@@ -5,7 +5,7 @@ from typing import Any
 from fastapi import FastAPI
 
 from database import db
-from routers import detections, events, sensors, statistics
+from routers import classes, detections, events, sensors, statistics
 
 app = FastAPI(title="Search and Rescue API", version="1.0.0")
 
@@ -13,6 +13,7 @@ app.include_router(detections.router)
 app.include_router(sensors.router)
 app.include_router(events.router)
 app.include_router(statistics.router)
+app.include_router(classes.router)
 
 
 @app.get("/health", tags=["health"])

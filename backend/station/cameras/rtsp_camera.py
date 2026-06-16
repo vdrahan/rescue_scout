@@ -1,0 +1,89 @@
+"""RTSP / USB camera sources backed by OpenCV (imported lazily).
+
+Low-latency RTSP grabbing mirrors the approach in ``backend/model/model.py``:
+keep the capture buffer tiny and grab a few frames to flush stale ones.
+"""
+
+from __future__ import annotations
+
+import os
+
+import numpy as np
+
+from ..logging_conf import get_logger
+from .base import CameraSource
+
+log = get_logger(__name__)
+
+# Low-latency RTSP transport, matching the legacy model.py settings.
+os.environ.setdefault(
+    "OPENCV_FFMPEG_CAPTURE_OPTIONS",
+    "rtsp_transport;udp|max_delay;0|fflags;nobuffer|flags;low_delay",
+)
+
+
+class _CvCamera(CameraSource):
+    def __init__(self, cam_id: str, name: str, kind: str, source):
+        super().__init__(cam_id, name, kind)
+        self._source = source
+        self._cap = None
+        self._open()
+
+    def _open(self) -> None:
+        self.close()
+        try:
+            import cv2  # noqa: WPS433 - real mode only
+
+            cap = cv2.VideoCapture(self._source, cv2.CAP_FFMPEG)
+            cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+            if not cap.isOpened():
+                self.status = "error"
+                self.last_error = "Camera could not be opened"
+                log.warning("Camera %s could not open source %s", self.id, self._source)
+                return
+            self._cap = cap
+            self.status = "ok"
+            self.last_error = ""
+        except Exception as exc:  # noqa: BLE001
+            self.status = "error"
+            self.last_error = str(exc)
+            log.warning("Camera %s init failed: %s", self.id, exc)
+
+    def read(self) -> np.ndarray | None:
+        if self._cap is None:
+            self._open()
+            if self._cap is None:
+                return None
+        try:
+            for _ in range(10):  # flush stale frames for low latency, as in model.py
+                self._cap.grab()
+            ok, frame = self._cap.retrieve()
+            if not ok:
+                self.status = "error"
+                self.last_error = "Camera stream stopped or frame could not be read"
+                self.close()
+                return None
+            self.status = "ok"
+            self.last_error = ""
+            return frame[..., ::-1].copy()  # BGR -> RGB
+        except Exception as exc:  # noqa: BLE001
+            self.status = "error"
+            self.last_error = str(exc)
+            self.close()
+            log.warning("Camera %s read failed: %s", self.id, exc)
+            return None
+
+    def close(self) -> None:
+        if self._cap is not None:
+            self._cap.release()
+            self._cap = None
+
+
+class RtspCamera(_CvCamera):
+    def __init__(self, cam_id: str, name: str, url: str):
+        super().__init__(cam_id, name, kind="rtsp", source=url)
+
+
+class UsbCamera(_CvCamera):
+    def __init__(self, cam_id: str, name: str, index: int):
+        super().__init__(cam_id, name, kind="usb", source=index)

@@ -11,6 +11,13 @@ from repositories import sensor as repo
 router = APIRouter(tags=["sensors"])
 
 
+# --- Sensors ---
+
+@router.get("/sensors")
+def list_sensors() -> list[dict[str, Any]]:
+    return repo.get_sensors()
+
+
 # --- Sensor Readings ---
 
 @router.get("/sensor-readings")

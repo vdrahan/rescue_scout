@@ -64,7 +64,7 @@ These classes describe the most realistic positions of a person in danger.
 
 ### Training & Export
 
-- Vision model: YOLO11s
+- Vision model: YOLOv26
 
 
 ## 4. Hardware & Makerlab plan
@@ -275,3 +275,59 @@ Adding the temperature sensor for detecting if operator is in dangerous environm
 ## 8. Usage of AI
 
 AI was used for choosing the appropriate hardware setup.
+
+
+## 9. Running the system
+
+Services: **db** (Postgres) · **api** (data API, FastAPI) · **station** (detection +
+cameras + hardware, FastAPI) · **frontend** (Gradio). The station and frontend run
+fully **mocked** by default, so the whole stack works on a laptop with no model,
+camera or Raspberry Pi hardware.
+
+```
+cp .env.example .env     # adjust values; never commit real secrets
+```
+
+### A. Docker Compose (laptop / everything mocked)
+
+```bash
+docker compose up --build
+# frontend  -> http://localhost:7860
+# data-api  -> http://localhost:8000/docs
+# station   -> http://localhost:8001/docs   (mapped from container port 8000)
+```
+
+### B. Local development (no Docker)
+
+```bash
+# data-api (needs DATABASE_URL pointing at a Postgres)
+cd backend/api && pip install -r requirements.txt && uvicorn main:app --port 8000
+
+# station (mock, separate terminal)
+cd backend && pip install -r station/requirements.txt
+STATION_PORT=8001 DETECTION_MODE=mock HARDWARE_MODE=mock python -m station
+
+# frontend (separate terminal)
+cd frontend && pip install -r requirements.txt
+STATION_URL=http://localhost:8001 API_URL=http://localhost:8000 python app.py
+```
+
+> The three services have intentionally separate `requirements.txt` files and
+> are isolated per-container; for local dev use a separate virtualenv per service
+> (or just use Docker) — gradio and the FastAPI backends pin different `starlette`
+> majors and should not share one venv.
+
+### C. Raspberry Pi 5 (real detection + hardware)
+
+```bash
+# drop your trained YOLOv26 weights at ./backend/model/weights/best.pt
+docker compose -f compose.yaml -f compose.pi.yaml up -d --build
+```
+
+The Pi override builds the station **full** image (torch + OpenCV + Pi libraries),
+sets `DETECTION_MODE=real` / `HARDWARE_MODE=real`, and grants access to
+`/dev/gpiochip0`, `/dev/i2c-1`, `/dev/video0` via `group_add` (gpio/i2c/video) —
+**without** privileged mode. Adjust the device list to match your wiring (Pi 5's
+40-pin header may appear as `gpiochip4`).
+
+Backend details: [backend/station/README.md](backend/station/README.md).

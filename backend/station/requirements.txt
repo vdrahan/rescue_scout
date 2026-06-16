@@ -1,0 +1,8 @@
+# Light / mock-mode dependencies — no torch, OpenCV or Raspberry Pi libraries.
+fastapi==0.115.14
+uvicorn[standard]==0.34.3
+pydantic==2.11.7
+pydantic-settings==2.7.1
+httpx==0.28.1
+numpy==2.2.6
+Pillow==12.2.0

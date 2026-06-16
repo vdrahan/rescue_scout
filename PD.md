@@ -59,7 +59,7 @@ Fill in every table below, just like you did with the real PD.
 | Topic                    | Your answer                                                              |
 | ------------------------ | ------------------------------------------------------------------------ |
 | **Model information**    | YOLOv26 — Input size: 640×640; Weights stored in `RPi/ai/best.pt`; Export format: PyTorch `.pt` |
-| **Training environment** | [✅] Laptop [ ] RPi [ ] Cloud — details: Trained on laptop using Python/YOLOv11, then transferred to RPi |
+| **Training environment** | [✅] Laptop [ ] RPi [ ] Cloud — details: Trained on laptop using Python/YOLOv26, then transferred to RPi |
 | **Export to RPi**        | The trained model (e.g.`best.pt`) is exported from the laptop and uploaded to GitHub. During deployment, it is pulled into the needed directory and loaded.                   |
 
 ---

@@ -1,0 +1,5 @@
+# Real detection stack (YOLOv26). Installed only for the "full" build profile.
+torch==2.6.0
+torchvision==0.21.0
+ultralytics==8.4.60
+opencv-python-headless==4.13.0.92

@@ -1,6 +1,25 @@
 name: search_rescue_system
 
 services:
+  db:
+    image: postgres:16.9-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/database/db_init.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - data
+
   api:
     build:
       context: .
@@ -27,56 +46,70 @@ services:
       - web
       - data
 
+  station:
+    build:
+      context: .
+      dockerfile: backend/station/Dockerfile
+      args:
+        STATION_PROFILE: ${STATION_PROFILE:-base}
+        STATION_PORT: ${STATION_PORT:-8000}
+    image: search-rescue-station:0.1.0
+    restart: unless-stopped
+    environment:
+      STATION_HOST: 0.0.0.0
+      STATION_PORT: ${STATION_PORT:-8000}
+      # Base compose runs fully mocked so it works on a laptop with no hardware.
+      DETECTION_MODE: ${DETECTION_MODE:-mock}
+      HARDWARE_MODE: ${HARDWARE_MODE:-mock}
+      # Talk to the data-api by service name, never localhost.
+      API_URL: http://api:${API_PORT:-8000}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports:
+      - "${STATION_HOST_PORT:-8001}:${STATION_PORT:-8000}"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:' + os.getenv('STATION_PORT', '8000') + '/health', timeout=5).read(1)\""]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - web
+
   frontend:
     build:
       context: .
-      dockerfile: backend/Dockerfile
+      dockerfile: frontend/Dockerfile
       args:
         FRONTEND_PORT: ${FRONTEND_PORT:-7860}
     image: search-rescue-frontend:0.1.0
     restart: unless-stopped
     environment:
-      FRONTEND_PORT: ${FRONTEND_PORT:-7860}
       GRADIO_SERVER_NAME: 0.0.0.0
       GRADIO_SERVER_PORT: ${FRONTEND_PORT:-7860}
-      MODEL_PATH: ${MODEL_PATH:-/app/model/runs/detect/rescue_person_detection_final/weights/best.pt}
-      START_MODEL_PATH: ${START_MODEL_PATH:-/app/yolo11n.pt}
-      DATA_YAML: ${DATA_YAML:-/app/model/data/data.yaml}
-      AUTO_TRAIN_MODEL: ${AUTO_TRAIN_MODEL:-false}
-      RTSP_CAMERA_1_URL: ${RTSP_CAMERA_1_URL:-}
+      # Service-name URLs so the frontend reaches the backends inside the network.
       API_URL: http://api:${API_PORT:-8000}
+      STATION_URL: http://station:${STATION_PORT:-8000}
+      FRONTEND_HTTP_TIMEOUT: ${FRONTEND_HTTP_TIMEOUT:-2.5}
+      FRONTEND_BACKEND_COOLDOWN: ${FRONTEND_BACKEND_COOLDOWN:-5.0}
+      FRONTEND_AUTO_START_DETECTION: ${FRONTEND_AUTO_START_DETECTION:-false}
     ports:
       - "${FRONTEND_PORT:-7860}:${FRONTEND_PORT:-7860}"
     depends_on:
       api:
+        condition: service_healthy
+      station:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:' + os.getenv('GRADIO_SERVER_PORT', '7860') + '/', timeout=5).read(1)\""]
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 90s
+      start_period: 60s
     networks:
       - web
-
-  db:
-    image: postgres:16.9-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env}
-      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./backend/database/db_init.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-    networks:
-      - data
 
 volumes:
   postgres_data:
