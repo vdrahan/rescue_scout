@@ -171,6 +171,10 @@ def test_component(component: str) -> dict | None:
     )
 
 
+def cycle_lcd_screen() -> dict | None:
+    return _json("station", _station, "POST", "/api/hardware/lcd/cycle")
+
+
 # ---------------------------------------------------------------------------
 # Data API (history / statistics)
 # ---------------------------------------------------------------------------

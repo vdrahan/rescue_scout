@@ -9,6 +9,7 @@ from __future__ import annotations
 import time
 
 from ..base import Lcd
+from .i2c_lock import BUS_1_LOCK
 
 _BACKLIGHT = 0x08
 _ENABLE = 0b00000100
@@ -48,11 +49,20 @@ class I2cLcd(Lcd):
         time.sleep(0.005)
 
     def write(self, lines: list[str]) -> None:
-        self._clear()
-        addresses = (0x80, 0xC0, 0x94, 0xD4)
-        for line, addr in zip(lines, addresses):
-            self._write_byte(addr, 0)
-            for ch in line.ljust(self._width)[: self._width]:
+        with BUS_1_LOCK:
+            self._clear()
+            addresses = (0x80, 0xC0, 0x94, 0xD4)
+            for line, addr in zip(lines, addresses):
+                self._write_byte(addr, 0)
+                for ch in line.ljust(self._width)[: self._width]:
+                    self._write_byte(ord(ch), 1)
+
+    def write_line(self, line_idx: int, text: str) -> None:
+        """Overwrite a single line without clearing the display (no flicker)."""
+        with BUS_1_LOCK:
+            addresses = (0x80, 0xC0, 0x94, 0xD4)
+            self._write_byte(addresses[line_idx], 0)
+            for ch in text.ljust(self._width)[: self._width]:
                 self._write_byte(ord(ch), 1)
 
     def value(self):

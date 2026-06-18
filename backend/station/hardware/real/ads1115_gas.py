@@ -23,6 +23,7 @@ import logging
 import time
 
 from ..base import GasSensor
+from .i2c_lock import BUS_1_LOCK
 
 log = logging.getLogger(__name__)
 
@@ -67,7 +68,8 @@ class Ads1115GasSensor(GasSensor):
         return total / _SAMPLES
 
     def read_ppm(self) -> float:
-        avg_raw = self._read_raw()
+        with BUS_1_LOCK:
+            avg_raw = self._read_raw()
         drop = max(0.0, _CLEAN_AIR_RAW - avg_raw)
         ppm = drop / _CLEAN_AIR_RAW * _MAX_PPM
         return round(ppm, 1)
@@ -80,7 +82,8 @@ class Ads1115GasSensor(GasSensor):
 
     def test(self) -> tuple[bool, str]:
         try:
-            avg_raw = self._read_raw()
+            with BUS_1_LOCK:
+                avg_raw = self._read_raw()
             drop = max(0.0, _CLEAN_AIR_RAW - avg_raw)
             ppm = round(drop / _CLEAN_AIR_RAW * _MAX_PPM, 1)
             return True, f"MQ-2 via PCF8591 avg_raw={avg_raw:.1f} baseline={_CLEAN_AIR_RAW} → {ppm} ppm"

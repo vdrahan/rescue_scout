@@ -65,6 +65,27 @@ class DataApiSink:
             "is_dangerous": dangerous,
         })
 
+    def count_dangerous(self, sensor_name: str) -> int:
+        """Return total dangerous reading count for a sensor from the data-api."""
+        if self._client is None:
+            return 0
+        try:
+            r = self._client.get(
+                "/sensor-readings/count",
+                params={"sensor_name": sensor_name, "dangerous_only": True},
+                timeout=2.0,
+            )
+            return int(r.json().get("count", 0))
+        except Exception:  # noqa: BLE001
+            return 0
+
+    def record_temperature(self, celsius: float, dangerous: bool) -> None:
+        self._enqueue("sensor", {
+            "sensor_name": "temperature", "value": round(celsius, 1),
+            "message": f"High temperature: {celsius:.0f}°C" if dangerous else f"Temperature: {celsius:.0f}°C",
+            "is_dangerous": dangerous,
+        })
+
     def record_event(self, event_type: str, importance: str = "INFO", message: str = "") -> None:
         self._enqueue("event", {
             "event_type": event_type, "importance_level": importance, "message": message,

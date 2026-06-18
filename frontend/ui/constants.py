@@ -113,11 +113,11 @@ TEST_GROUPS = [
         "Actuators",
         YELLOW,
         [
-            {"id": "detection_led", "name": "Detection LED", "accent": RED, "checks": [("GPIO Pin", "GPIO 17"), ("State Change", "ON/OFF"), ("Response Time", "< 20 ms")]},
+            {"id": "detection_led", "name": "FPV Feed LED", "accent": RED, "checks": [("GPIO Pin", "GPIO 17"), ("State Change", "ON/OFF"), ("Response Time", "< 20 ms")]},
             {"id": "buzzer", "name": "Buzzer", "accent": YELLOW, "checks": [("GPIO Pin", "GPIO 5"), ("Pulse Pattern", "3 beeps"), ("Volume", "Audible")]},
-            {"id": "system_led", "name": "System LED", "accent": GREEN, "checks": [("GPIO Pin", "GPIO 23"), ("State Change", "ON/OFF"), ("Brightness", "Stable")]},
+            {"id": "system_led", "name": "Detection Feed LED", "accent": GREEN, "checks": [("GPIO Pin", "GPIO 23"), ("State Change", "ON/OFF"), ("Brightness", "Stable")]},
             {"id": "rgb_module", "name": "RGB Module", "accent": PURPLE, "checks": [("GPIO Pins", "26 / 16 / 6"), ("Color Cycle", "R/G/B"), ("Mode", "Digital")]},
-            {"id": "rgb_status", "name": "RGB PWM LED", "accent": BLUE, "checks": [("GPIO Pins", "22 / 24 / 27"), ("Color Cycle", "G/R/B/Y"), ("Mode", "PWM")]},
+            {"id": "rgb_status", "name": "System Status LED", "accent": BLUE, "checks": [("GPIO Pins", "22 / 24 / 27"), ("Color Cycle", "G/R/B/Y"), ("Mode", "PWM")]},
         ],
     ),
 ]
@@ -886,7 +886,7 @@ button.primary, .primary button {
 .log-table tbody tr:last-child td { border-bottom: 0; }
 .log-table tbody tr:hover { background: var(--sar-surface-soft); }
 
-/* Gas warning banner — full-width, appears between header and page content */
+/* Warning banner — full-width, appears between header and page content */
 #gas-banner,
 #gas-banner.block,
 #gas-banner > .wrap {
@@ -914,6 +914,34 @@ button.primary, .primary button {
 @keyframes gas-pulse {
   0%, 100% { border-color: #fca5a5; background: #fff1f2; }
   50%       { border-color: #ef4444; background: #fee2e2; }
+}
+/* Area safe banner — green */
+.area-safe-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 14px;
+  padding: 8px 14px;
+  background: #f0fdf4;
+  border: 1.5px solid #86efac;
+  border-radius: 10px;
+  color: #166534;
+  font-size: 13px;
+  font-weight: 600;
+}
+.area-safe-banner .gas-warning-text strong { color: #14532d; }
+
+/* Temperature warning banner — amber/orange to distinguish from gas red */
+.temp-warning-banner {
+  background: #fffbeb !important;
+  border-color: #fcd34d !important;
+  color: #92400e !important;
+  animation: temp-pulse 1.5s ease-in-out infinite;
+}
+.temp-warning-banner .gas-warning-text strong { color: #78350f; }
+@keyframes temp-pulse {
+  0%, 100% { border-color: #fcd34d; background: #fffbeb; }
+  50%       { border-color: #f59e0b; background: #fef3c7; }
 }
 
 /* Export notice banner — temporary, compact, warning style */
@@ -1019,6 +1047,14 @@ button.primary, .primary button {
   border-color: #fca5a5 !important;
 }
 
+/* Force vertical stacking inside test cards */
+.test-card-v2 > .form {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0 !important;
+  width: 100% !important;
+}
+
 /* Belt-and-suspenders: also zero out backgrounds explicitly */
 .test-card-v2 .form,
 .test-card-v2 .block,
@@ -1033,15 +1069,15 @@ button.primary, .primary button {
   margin: 0 !important;
 }
 
-.tcv2-header-row {
-  gap: 8px !important;
-  align-items: center !important;
-  flex-wrap: nowrap !important;
+/* Button sits below the rows, full width */
+.tcv2-btn {
+  margin-top: 10px !important;
+  width: 100% !important;
+  order: 99 !important;
 }
-.tcv2-header { flex: 1 1 0 !important; min-width: 0 !important; }
-.tcv2-btn { flex: 0 0 auto !important; }
 .tcv2-btn button {
   background: #ffffff !important;
+  background-color: #ffffff !important;
   color: var(--sar-text-muted) !important;
   border: 1px solid #e5e7eb !important;
   border-radius: 6px !important;
@@ -1050,6 +1086,7 @@ button.primary, .primary button {
   height: 28px !important;
   padding: 0 10px !important;
   box-shadow: none !important;
+  width: 100% !important;
 }
 
 /* 22. STATUS NOTICES */
@@ -1468,7 +1505,12 @@ button.primary, .primary button {
   .about-display-grid, .about-faq-grid { grid-template-columns: repeat(1, minmax(0, 1fr)); }
 }
 
-/* Diagnostic Summary — strip gr.HTML block wrapper, card is self-contained HTML */
+/* Diagnostic Summary — pin to top of its column and strip wrapper chrome */
+#diag-summary-col {
+  align-self: flex-start !important;
+  position: sticky;
+  top: 8px;
+}
 #diag-summary-html,
 #diag-summary-html.block,
 #diag-summary-html > .wrap,

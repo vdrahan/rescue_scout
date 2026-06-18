@@ -44,3 +44,23 @@ def test_component(component: str,
         # e.g. camera_servo not wired in this build
         return {"component": component, "status": "skipped", "detail": "not present in this build"}
     return result
+
+
+@router.post("/lcd/cycle")
+def lcd_cycle(services: AppServices = Depends(get_services)) -> dict[str, Any]:
+    latest = services.detection.latest()
+    counts: dict = latest.get("counts") or {}
+    gas = services.hardware.gas_status()
+    sink = services.sink
+    screen = services.hardware.cycle_lcd_screen(
+        last_detection=latest.get("last_detection"),
+        total=sum(counts.values()),
+        class_num=len(counts),
+        hw_ok=not services.hardware.degraded,
+        video_ok=not services.cameras.degraded,
+        gas_ppm=gas.get("ppm"),
+        gas_dangerous=bool(gas.get("dangerous")),
+        gas_warnings=sink.count_dangerous("gas"),
+        temp_warnings=sink.count_dangerous("temperature"),
+    )
+    return {"screen": screen}

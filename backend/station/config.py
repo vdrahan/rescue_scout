@@ -59,12 +59,12 @@ class Settings(BaseSettings):
     buzzer_pin: int = 5
     system_led_pin: int = 23     # LED1
     detection_led_pin: int = 17  # LED2
-    rgb1_r_pin: int = 26
+    rgb1_r_pin: int = 6
     rgb1_g_pin: int = 16
-    rgb1_b_pin: int = 6
-    rgb2_r_pin: int = 22
-    rgb2_g_pin: int = 24
-    rgb2_b_pin: int = 27
+    rgb1_b_pin: int = 26
+    rgb2_r_pin: int = 27
+    rgb2_g_pin: int = 22
+    rgb2_b_pin: int = 24
     button_page_pin: int = 20
     button_camera_pin: int = 21
     dht_pin: int = 25

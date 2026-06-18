@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import gradio as gr
 
 from ..constants import TEST_GROUPS, TEST_IDS
-from ..handlers import diagnostic_summary_html, diagnostic_progress, initial_test_state, test_header_html, test_rows_html
+from ..handlers import diagnostic_summary_html, diagnostic_progress, initial_test_state, system_events_html, test_header_html, test_rows_html
 
 
 @dataclass
@@ -22,16 +22,15 @@ class DebuggingPage:
 
 def _build_test_card(test: dict) -> tuple[str, gr.Button, gr.HTML, gr.HTML]:
     with gr.Group(elem_classes=["test-card-v2"]):
-        with gr.Row(elem_classes=["tcv2-header-row"]):
-            header_html = gr.HTML(
-                value=test_header_html(test, "not_tested"),
-                elem_classes=["tcv2-header"],
-            )
-            button = gr.Button("▷ Test", size="sm", elem_classes=["tcv2-btn"])
+        header_html = gr.HTML(
+            value=test_header_html(test, "not_tested"),
+            elem_classes=["tcv2-header"],
+        )
         rows_html = gr.HTML(
             value=test_rows_html(test, "not_tested"),
             elem_classes=["tcv2-rows"],
         )
+        button = gr.Button("▷ Test", size="sm", elem_classes=["tcv2-btn"])
     return test["id"], button, header_html, rows_html
 
 
@@ -68,6 +67,9 @@ def build_debugging_page() -> DebuggingPage:
                 value=diagnostic_summary_html(initial_test_state()),
                 elem_id="diag-summary-html",
             )
+
+    with gr.Accordion("System Events", open=False, elem_classes=["logs-accordion"]):
+        gr.HTML(value=system_events_html(), elem_classes=["log-table-container"])
 
     return DebuggingPage(
         test_state=test_state,

@@ -83,12 +83,12 @@ class GpioRgbLed(_LgpioDevice, RgbLed):
         self._color = (0.0, 0.0, 0.0)
         for pin in self._pins:
             self._claim_output(pin, 0)
-            self._pwm(pin, 0)
+            self._pwm(pin, 100)  # common anode: 100% duty = off
 
     def set_color(self, r: float, g: float, b: float) -> None:
         self._color = (r, g, b)
         for pin, duty in zip(self._pins, self._color):
-            self._pwm(pin, duty)
+            self._pwm(pin, 100.0 - duty)  # common anode: invert duty
 
     def value(self):
         return self._color
@@ -116,11 +116,11 @@ class GpioRgbModule(_LgpioDevice, RgbModule):
         self._channels = {"red": r, "green": g, "blue": b}
         self._active: str | None = None
         for pin in self._channels.values():
-            self._claim_output(pin, 0)
+            self._claim_output(pin, 1)  # common anode: 1 = off
 
     def set_channel(self, channel: str | None) -> None:
         for name, pin in self._channels.items():
-            self._write(pin, 1 if name == channel else 0)
+            self._write(pin, 0 if name == channel else 1)  # common anode: 0 = on
         self._active = channel
 
     def value(self):

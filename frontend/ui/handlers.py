@@ -137,34 +137,69 @@ def current_clock() -> str:
     return f"`{datetime.now().strftime('%H:%M:%S  |  %d %b %Y')}`"
 
 
-_GAS_ALERT_WINDOW_SECONDS = 30
+_ALERT_WINDOW_SECONDS = 30
+
+
+def _recent_dangerous(sensor_name: str) -> float | None:
+    """Return sensor value if a dangerous reading exists within the alert window, else None."""
+    try:
+        rows = api_client.sensor_readings(sensor_name=sensor_name, dangerous_only=True, limit=1)
+        if not rows:
+            return None
+        age = (datetime.now() - datetime.fromisoformat(rows[0]["reading_time"])).total_seconds()
+        if age > _ALERT_WINDOW_SECONDS:
+            return None
+        return float(rows[0]["value"])
+    except Exception:  # noqa: BLE001
+        return None
 
 
 def gas_banner_html() -> str:
-    """Show warning if a dangerous gas reading was recorded in the last 30 seconds.
+    """Single status banner: safe info when all clear, warning when gas/temp danger."""
+    gas_alert = _recent_dangerous("gas")
+    temp_alert = _recent_dangerous("temperature")
 
-    Reads from the data-api DB (not the live station endpoint) so the banner is
-    immune to station circuit-breaker trips and real-time polling timing gaps.
-    """
+    # Alert states
+    if gas_alert is not None or temp_alert is not None:
+        if gas_alert is not None and temp_alert is not None:
+            content = (
+                f"<strong>Gas Detected</strong> — {gas_alert:.0f} ppm"
+                f" &nbsp;|&nbsp; "
+                f"<strong>High Temperature</strong> — {temp_alert:.0f}°C"
+            )
+            icon = "⚠️"
+            extra_class = ""
+        elif gas_alert is not None:
+            content = f"<strong>Gas Detected</strong> — MQ-2 reads {gas_alert:.0f} ppm. Ventilate immediately."
+            icon = "⚠️"
+            extra_class = ""
+        else:
+            content = f"<strong>High Temperature</strong> — DHT11 reads {temp_alert:.0f}°C. Area may be unsafe."
+            icon = "🌡️"
+            extra_class = " temp-warning-banner"
+        return f"""<div id="warning-banner-inner" class="gas-warning-banner{extra_class}">
+  <span class="gas-warning-icon">{icon}</span>
+  <span class="gas-warning-text">{content}</span>
+</div>"""
+
+    # Safe state — fetch live readings to show current values
+    gas_str = "N/A"
+    temp_str = "N/A"
     try:
-        rows = api_client.sensor_readings(sensor_name="gas", dangerous_only=True, limit=1)
-        if not rows:
-            return '<div id="gas-banner-inner" style="display:none"></div>'
-        latest = rows[0]
-        reading_time = datetime.fromisoformat(latest["reading_time"])
-        age = (datetime.now() - reading_time).total_seconds()
-        if age > _GAS_ALERT_WINDOW_SECONDS:
-            return '<div id="gas-banner-inner" style="display:none"></div>'
-        ppm = float(latest["value"])
+        hw = api_client.hardware_status() or {}
+        gas_val = hw.get("gas", {}).get("ppm")
+        temp_val = hw.get("climate", {}).get("temperature")
+        if gas_val is not None:
+            gas_str = f"{float(gas_val):.0f} ppm"
+        if temp_val is not None:
+            temp_str = f"{float(temp_val):.0f}°C"
     except Exception:  # noqa: BLE001
-        return '<div id="gas-banner-inner" style="display:none"></div>'
+        pass
 
-    ppm_text = f"{ppm:.0f} ppm"
-    return f"""<div id="gas-banner-inner" class="gas-warning-banner">
-  <span class="gas-warning-icon">⚠️</span>
+    return f"""<div id="warning-banner-inner" class="area-safe-banner">
+  <span class="gas-warning-icon">✅</span>
   <span class="gas-warning-text">
-    <strong>Gas Detected</strong> — MQ-2 reads {ppm_text}.
-    Ventilate the area immediately and keep personnel away.
+    <strong>Area Safe</strong> &nbsp;—&nbsp; Gas: {gas_str} &nbsp;|&nbsp; Temperature: {temp_str}
   </span>
 </div>"""
 
@@ -422,6 +457,15 @@ def lcd_message(page: str) -> str:
     return f"LCD cycle: {title} | STATUS ACTIVE | VIDEO CONNECTED"
 
 
+_SCREEN_LABELS = {0: "LCD: System Status", 1: "LCD: Last Detection", 2: "LCD: Statistics", 3: "LCD: Gas Status"}
+
+def cycle_lcd_screen() -> str:
+    result = api_client.cycle_lcd_screen()
+    if result is None:
+        return "LCD: unavailable"
+    return _SCREEN_LABELS.get(result.get("screen", 0), "LCD: ok")
+
+
 def _format_detection_row(r: dict) -> list[str]:
     dt = str(r.get("detection_time", ""))
     date_part, _, time_part = dt.replace(" ", "T").partition("T")
@@ -604,6 +648,14 @@ def _series_for(data_source: str):
         return ([_fmt_bucket(r["bucket"]) for r in rows],
                 [float(r.get("avg_value") or 0) for r in rows], "Gas ppm", YELLOW, 250, "")
 
+    if data_source == "Temperature":
+        rows = api_client.stat_sensor_over_time("temperature", "minute")
+        result = api_client.service_result(rows, "Backend unavailable")
+        if not result.available or not result.has_data:
+            return [], [], "°C", "#f97316", 50, result.message
+        return ([_fmt_bucket(r["bucket"]) for r in rows],
+                [float(r.get("avg_value") or 0) for r in rows], "°C", "#f97316", 50, "")
+
     rows = api_client.stat_detections_over_time("minute")
     result = api_client.service_result(rows, "Backend unavailable")
     if not result.available or not result.has_data:
@@ -649,9 +701,9 @@ def overview_figure(kind: str) -> go.Figure:
         fig = class_distribution_figure()
         fig.update_layout(title_text="Detections by Class", height=280)
         return fig
-    if kind == "performance":
-        fig = _empty_figure("System Performance", "No data yet")
-        fig.update_layout(height=280)
+    if kind == "temperature":
+        fig = build_statistics_figure("Temperature", "Line")
+        fig.update_layout(title_text="Temperature Sensor Readings", height=280)
         return fig
     fig = build_statistics_figure("Detections", "Area")
     fig.update_layout(title_text="Detection Events Timeline", height=280)
@@ -894,24 +946,25 @@ def diagnostic_summary_html(state: dict[str, str] | None) -> str:
             for fid in failed_ids
         ]
 
-    r, circ = 30, 188.5
+    # Bigger ring: 110px diameter
+    r, circ = 46, 289.0
     offset = circ * (1 - pct / 100)
     svg = (
-        f'<svg width="76" height="76" viewBox="0 0 76 76">'
-        f'<circle cx="38" cy="38" r="{r}" fill="none" stroke="#e5e7eb" stroke-width="7"/>'
-        f'<circle cx="38" cy="38" r="{r}" fill="none" stroke="{ring_color}" stroke-width="7"'
+        f'<svg width="110" height="110" viewBox="0 0 110 110">'
+        f'<circle cx="55" cy="55" r="{r}" fill="none" stroke="#e5e7eb" stroke-width="9"/>'
+        f'<circle cx="55" cy="55" r="{r}" fill="none" stroke="{ring_color}" stroke-width="9"'
         f' stroke-dasharray="{circ}" stroke-dashoffset="{offset:.1f}"'
-        f' stroke-linecap="round" transform="rotate(-90 38 38)"/>'
-        f'<text x="38" y="43" text-anchor="middle" font-size="14" font-weight="800"'
+        f' stroke-linecap="round" transform="rotate(-90 55 55)"/>'
+        f'<text x="55" y="62" text-anchor="middle" font-size="20" font-weight="800"'
         f' fill="{ring_color}">{pct}%</text></svg>'
     )
     ok_badge = (
         f"<span style='background:#d1fae5;color:#065f46;border-radius:999px;"
-        f"font-size:11px;font-weight:600;padding:2px 8px'>{ok_count} params OK</span>"
+        f"font-size:11px;font-weight:600;padding:3px 10px'>{ok_count} params OK</span>"
     )
     fail_badge = (
         f"<span style='background:#fee2e2;color:#991b1b;border-radius:999px;"
-        f"font-size:11px;font-weight:600;padding:2px 8px'>{fail_count} failed</span>"
+        f"font-size:11px;font-weight:600;padding:3px 10px'>{fail_count} failed</span>"
     )
 
     issue_cards = ""
@@ -936,18 +989,18 @@ def diagnostic_summary_html(state: dict[str, str] | None) -> str:
         if issues else ""
     )
 
-    # Full card rendered as plain HTML — no Gradio Group/Markdown wrappers
+    # Layout: title → status label → ring → badges (all centred, stacked vertically)
     return (
         f"<div style='background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;"
-        f"padding:12px;box-shadow:0 1px 2px rgba(15,23,42,0.04)'>"
-        f"<div style='font-size:14px;font-weight:800;color:#1e293b;margin-bottom:10px'>"
-        f"Diagnostic Summary</div>"
-        f"<div style='display:flex;align-items:center;gap:12px;margin-bottom:4px'>"
-        f"{svg}<div>"
-        f"<div style='font-size:15px;font-weight:800;color:#1e293b'>{status_label}</div>"
-        f"<div style='display:flex;gap:6px;margin-top:4px'>{ok_badge} {fail_badge}</div>"
-        f"</div></div>"
-        f"{issues_html}"
+        f"padding:16px 12px;box-shadow:0 1px 2px rgba(15,23,42,0.04);text-align:center'>"
+        f"<div style='font-size:13px;font-weight:800;color:#94a3b8;letter-spacing:0.06em;"
+        f"text-transform:uppercase;margin-bottom:4px'>Diagnostic Summary</div>"
+        f"<div style='font-size:16px;font-weight:800;color:#1e293b;margin-bottom:12px'>"
+        f"{status_label}</div>"
+        f"<div style='display:flex;justify-content:center;margin-bottom:12px'>{svg}</div>"
+        f"<div style='display:flex;justify-content:center;gap:8px;flex-wrap:wrap'>"
+        f"{ok_badge} {fail_badge}</div>"
+        f"{('<div style=\"margin-top:14px;text-align:left\">' + issues_html + '</div>') if issues_html else ''}"
         f"</div>"
     )
 
@@ -1127,6 +1180,12 @@ def wire_callbacks(layout: Any) -> None:
             layout.operating.mission_duration,
             layout.operating.recent_html,
         ],
+        show_progress="hidden",
+    )
+    layout.lcd_button.click(
+        fn=cycle_lcd_screen,
+        inputs=None,
+        outputs=[layout.lcd_status],
         show_progress="hidden",
     )
     wire_operating_page(layout.operating, layout.nav)

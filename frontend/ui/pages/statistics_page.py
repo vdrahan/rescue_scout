@@ -17,7 +17,7 @@ class StatisticsPage:
 def build_statistics_page() -> StatisticsPage:
     with gr.Group(elem_classes=["app-card"]):
         with gr.Row():
-            source = gr.Radio(["Detections", "Gas Alerts"], value="Detections", label="Data source")
+            source = gr.Radio(["Detections", "Gas Alerts", "Temperature"], value="Detections", label="Data source")
             chart_type = gr.Radio(["Line", "Bar", "Scatter", "Area", "Histogram"], value="Line", label="Chart type")
         main_plot = gr.Plot(value=build_statistics_figure("Detections", "Line"), show_label=False, elem_classes=["plot-card"])
 
@@ -27,6 +27,6 @@ def build_statistics_page() -> StatisticsPage:
         gr.Plot(value=overview_figure("gas"), show_label=False)
     with gr.Row():
         gr.Plot(value=overview_figure("classes"), show_label=False)
-        gr.Plot(value=overview_figure("performance"), show_label=False)
+        gr.Plot(value=overview_figure("temperature"), show_label=False)
 
     return StatisticsPage(source=source, chart_type=chart_type, main_plot=main_plot)

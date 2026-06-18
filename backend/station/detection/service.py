@@ -57,6 +57,8 @@ class DetectionService:
         self._debounce: dict[str, float] = {}
         self._last_gas_check = 0.0
         self._gas_was_dangerous = False  # tracks previous state for edge detection
+        self._temp_was_high = False
+        self._last_temp_check = 0.0
 
         # Start gas polling thread immediately (independent of detection)
         self._gas_stop = threading.Event()
@@ -166,12 +168,14 @@ class DetectionService:
                 self._counts[det.class_name] += 1
                 self._last_detection = entry
             self._sink.record_detection(det.class_name, det.confidence)
-            if det.priority == "HIGH" and not alerted:
-                self._hw.alert()
+            self._hw.blink_rgb_module_red(3.0)
+            self._hw.show_detection_on_lcd(det.class_name, entry["time"])
+            if not alerted:
+                self._hw.priority_alert(det.priority)
                 alerted = True
 
     def _gas_loop(self) -> None:
-        """Background thread: read MQ-2 every 2 s and record to database."""
+        """Background thread: read MQ-2 every 2 s and temperature every 10 s."""
         while not self._gas_stop.is_set():
             self._gas_stop.wait(timeout=2.0)
             if self._gas_stop.is_set():
@@ -181,17 +185,40 @@ class DetectionService:
                 if reading.get("ppm") is None:
                     continue
                 self._sink.record_gas(reading["ppm"], reading["dangerous"])
-                # Buzz only on safe → dangerous transition (not every poll)
                 now_dangerous = reading["dangerous"]
                 if now_dangerous and not self._gas_was_dangerous:
                     threading.Thread(
                         target=self._hw.gas_alert,
+                        args=(reading["ppm"],),
                         name="gas-buzz",
                         daemon=True,
                     ).start()
                 self._gas_was_dangerous = now_dangerous
             except Exception as exc:  # noqa: BLE001
                 log.warning("gas poll error: %s", exc)
+
+            # Temperature check every 10 s
+            now = time.time()
+            if now - self._last_temp_check < 5.0:
+                continue
+            self._last_temp_check = now
+            try:
+                climate = self._hw.read_climate()
+                temp = climate.get("temperature")
+                if temp is None:
+                    continue
+                now_high = float(temp) > 50.0
+                self._sink.record_temperature(float(temp), now_high)
+                if now_high and not self._temp_was_high:
+                    threading.Thread(
+                        target=self._hw.temp_alert,
+                        args=(float(temp),),
+                        name="temp-buzz",
+                        daemon=True,
+                    ).start()
+                self._temp_was_high = now_high
+            except Exception as exc:  # noqa: BLE001
+                log.warning("temp poll error: %s", exc)
 
     def _poll_gas(self) -> None:
         pass  # gas polling moved to dedicated _gas_loop thread

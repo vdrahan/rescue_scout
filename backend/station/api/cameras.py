@@ -24,6 +24,8 @@ def set_active(body: SetActiveCameraIn,
                services: AppServices = Depends(get_services)) -> dict[str, Any]:
     if not services.cameras.set_active(body.camera_id):
         raise HTTPException(status_code=404, detail=f"Unknown camera: {body.camera_id}")
+    services.hardware.set_fpv_led(body.camera_id == "fpv")
+    services.hardware.set_detection_feed_led(body.camera_id == "detection")
     return {"active": services.cameras.active_id, "cameras": services.cameras.list()}
 
 

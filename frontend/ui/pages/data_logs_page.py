@@ -13,7 +13,6 @@ from ..handlers import (
     gas_alerts_html,
     gas_history_figure,
     metric_html,
-    system_events_html,
 )
 
 
@@ -66,12 +65,6 @@ def build_data_logs_page() -> DataLogsPage:
         with gr.Accordion("Detection Events", open=True, elem_classes=["logs-accordion"]):
             detection_table = gr.HTML(
                 value=detection_events_html("All classes"),
-                elem_classes=["log-table-container"],
-            )
-
-        with gr.Accordion("System Events", open=False, elem_classes=["logs-accordion"]):
-            gr.HTML(
-                value=system_events_html(),
                 elem_classes=["log-table-container"],
             )
 

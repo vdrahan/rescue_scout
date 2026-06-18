@@ -28,6 +28,8 @@ async def lifespan(app: FastAPI):
     setup_logging(settings.log_level)
 
     hardware_mgr = HardwareManager(settings)
+    hardware_mgr.set_status_led(100, 40, 0)   # orange = starting up
+
     camera_mgr = CameraManager(settings)
     camera_reader = CameraReader(camera_mgr, settings)
     camera_reader.start()
@@ -48,9 +50,22 @@ async def lifespan(app: FastAPI):
         bundle.mode, " (degraded)" if bundle.degraded else "",
         hardware_mgr.mode, " (degraded)" if hardware_mgr.degraded else "",
     )
+    hardware_mgr.set_status_led(0, 100, 0)   # green = system ready
+    hardware_mgr.set_detection_feed_led(True)  # detection camera is active by default
+    error_parts = []
+    if hardware_mgr.degraded:
+        error_parts.append(hardware_mgr.note)
+    if camera_mgr.degraded:
+        error_parts.append("camera unavailable")
+    hardware_mgr.show_startup_lcd(
+        hw_ok=not hardware_mgr.degraded,
+        video_ok=not camera_mgr.degraded,
+        error="; ".join(error_parts),
+    )
     try:
         yield
     finally:
+        hardware_mgr.set_status_led(0, 0, 0)  # off = shutting down
         detection_svc.stop()
         camera_reader.stop()
         sink.close()
