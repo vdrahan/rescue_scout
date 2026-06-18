@@ -60,6 +60,8 @@ class I2cLcd(Lcd):
 
     def test(self) -> tuple[bool, str]:
         self.write(["HARDWARE TEST", "LCD OK"])
+        time.sleep(2)
+        self._clear()
         return True, "LCD wrote 2 lines"
 
     def close(self) -> None:

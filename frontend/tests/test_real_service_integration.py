@@ -180,6 +180,16 @@ class HandlerNoMockFallbackTests(unittest.TestCase):
         with patch.object(handlers.api_client, "test_component", return_value=None):
             self.assertEqual(handlers._component_status("buzzer"), "failed")
 
+    def test_skipped_debug_component_does_not_pass(self) -> None:
+        with patch.object(handlers.api_client, "test_component", return_value={"status": "skipped"}):
+            self.assertEqual(handlers._component_status("camera_servo"), "skipped")
+
+    def test_debug_component_calls_station_hardware_test(self) -> None:
+        with patch.object(handlers.api_client, "test_component", return_value={"status": "passed"}) as test_component:
+            self.assertEqual(handlers._component_status("rgb_module"), "passed")
+
+        test_component.assert_called_once_with("rgb_module")
+
     def test_old_partial_visibility_names_are_canonicalized(self) -> None:
         self.assertEqual(
             handlers._canonical_class("partially_hidden"),

@@ -7,6 +7,7 @@ import gradio as gr
 from .constants import APP_TITLE, DEFAULT_PAGE, PAGE_DETAILS, PAGE_KEYS, PAGE_UI_LABELS
 from .handlers import (
     current_clock,
+    gas_banner_html,
     header_icon_html,
     logo_html,
     operating_initial_state,
@@ -30,6 +31,7 @@ class DashboardLayout:
     lcd_status: gr.Textbox
     clock: gr.Markdown
     timer: gr.Timer
+    gas_banner: gr.HTML
     page_columns: list[gr.Column]
     operating: OperatingPage
     onboarding: OnboardingPage
@@ -70,6 +72,8 @@ def _build_shell() -> DashboardLayout:
                         elem_classes=["lcd-status"],
                     )
 
+            gas_banner = gr.HTML(gas_banner_html(), elem_id="gas-banner")
+
             with gr.Column(elem_id="page-stack"):
                 page_columns: list[gr.Column] = []
 
@@ -104,6 +108,7 @@ def _build_shell() -> DashboardLayout:
         lcd_status=lcd_status,
         clock=clock,
         timer=timer,
+        gas_banner=gas_banner,
         page_columns=page_columns,
         operating=operating,
         onboarding=onboarding,

@@ -112,11 +112,11 @@ def create(class_id: int, people_count: int, confidence: float) -> dict[str, Any
         with conn.cursor() as cur:
             cur.execute(
                 """
-                INSERT INTO detection (class_id, people_count, confidence)
-                VALUES (%s, %s, %s)
+                INSERT INTO detection (class_id, people_count, confidence, detection_time)
+                VALUES (%s, %s, %s, %s)
                 RETURNING detection_id, detection_time;
                 """,
-                (class_id, people_count, confidence),
+                (class_id, people_count, confidence, datetime.now()),
             )
             row = cur.fetchone()
         conn.commit()

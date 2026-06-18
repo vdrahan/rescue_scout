@@ -98,15 +98,15 @@ TEST_GROUPS = [
             {"id": "fpv_camera", "name": "FPV Camera", "accent": GREEN, "checks": [("RTSP Stream", "Connected"), ("Frame Rate", ">= 25 fps"), ("Latency", "< 200 ms")]},
             {"id": "detection_camera", "name": "Detection Camera", "accent": GREEN, "checks": [("RTSP Stream", "Connected"), ("Frame Rate", ">= 25 fps"), ("Resolution", "1280 x 720")]},
             {"id": "touchscreen", "name": "Touchscreen", "accent": PURPLE, "checks": [("Driver", "Loaded"), ("Touch Events", "Detected"), ("Response Time", "< 30 ms")]},
-            {"id": "lcd_display", "name": "LCD Display", "accent": BLUE, "checks": [("I2C Address", "0x27"), ("Response Time", "< 50 ms"), ("Screen Cycle", "4 pages")]},
+            {"id": "lcd_display", "name": "LCD Display", "accent": BLUE, "checks": [("I2C Address", "0x27"), ("Message", "HARDWARE TEST"), ("Backlight", "On")]},
         ],
     ),
     (
         "Sensors",
         PURPLE,
         [
-            {"id": "gas_sensor", "name": "Gas Sensor MQ-2", "accent": PURPLE, "checks": [("GPIO Signal", "1.5-3.3 V"), ("Current Reading", "< 250 ppm"), ("Response Time", "< 100 ms")]},
-            {"id": "temp_humidity", "name": "Temp & Humidity (DHT22)", "accent": BLUE, "checks": [("Temperature", "10-50 C"), ("Humidity", "20-90%"), ("Data Pin", "GPIO 4")]},
+            {"id": "gas_sensor", "name": "Gas Sensor MQ-2", "accent": PURPLE, "checks": [("ADC", "ADS1115 A0"), ("Current Reading", "< 250 ppm"), ("I2C Address", "0x48")]},
+            {"id": "temp_humidity", "name": "Temp & Humidity (DHT11)", "accent": BLUE, "checks": [("Temperature", "10-50 C"), ("Humidity", "20-90%"), ("Data Pin", "GPIO 25")]},
         ],
     ),
     (
@@ -114,9 +114,10 @@ TEST_GROUPS = [
         YELLOW,
         [
             {"id": "detection_led", "name": "Detection LED", "accent": RED, "checks": [("GPIO Pin", "GPIO 17"), ("State Change", "ON/OFF"), ("Response Time", "< 20 ms")]},
-            {"id": "buzzer", "name": "Buzzer", "accent": YELLOW, "checks": [("GPIO Pin", "GPIO 27"), ("Pulse Pattern", "3 beeps"), ("Volume", "Audible")]},
-            {"id": "system_led", "name": "System LED", "accent": GREEN, "checks": [("GPIO Pin", "GPIO 22"), ("Power State", "ON"), ("Brightness", "Stable")]},
-            {"id": "camera_servo", "name": "Camera Servo", "accent": BLUE, "checks": [("PWM Signal", "50 Hz"), ("Angle", "0-90 deg"), ("Jitter", "< 2 deg")]},
+            {"id": "buzzer", "name": "Buzzer", "accent": YELLOW, "checks": [("GPIO Pin", "GPIO 5"), ("Pulse Pattern", "3 beeps"), ("Volume", "Audible")]},
+            {"id": "system_led", "name": "System LED", "accent": GREEN, "checks": [("GPIO Pin", "GPIO 23"), ("State Change", "ON/OFF"), ("Brightness", "Stable")]},
+            {"id": "rgb_module", "name": "RGB Module", "accent": PURPLE, "checks": [("GPIO Pins", "26 / 16 / 6"), ("Color Cycle", "R/G/B"), ("Mode", "Digital")]},
+            {"id": "rgb_status", "name": "RGB PWM LED", "accent": BLUE, "checks": [("GPIO Pins", "22 / 24 / 27"), ("Color Cycle", "G/R/B/Y"), ("Mode", "PWM")]},
         ],
     ),
 ]
@@ -814,12 +815,9 @@ button.primary, .primary button {
   font-weight: 700 !important;
 }
 .logs-card .logs-export-col button:hover { background: var(--sar-orange-dark) !important; border-color: var(--sar-orange-dark) !important; }
-/* logs-nav-row: tabs column left, filter column right, top-aligned */
-.logs-nav-row { align-items: flex-start !important; gap: 8px !important; margin: 0 !important; }
-.logs-tabs-col.block,
-.logs-tabs-col { background: transparent !important; border: 0 !important; box-shadow: none !important; padding: 0 !important; min-height: 0 !important; }
-.logs-filter-col.block,
-.logs-filter-col { background: transparent !important; border: 0 !important; box-shadow: none !important; padding: 0 !important; min-height: 0 !important; padding-top: 6px !important; }
+/* Class filter — sits above accordion panels */
+.logs-filter-col-top.block,
+.logs-filter-col-top { background: transparent !important; border: 0 !important; box-shadow: none !important; padding: 2px 0 6px !important; min-height: 0 !important; }
 .logs-filter, .logs-filter > div, .logs-filter .block,
 .logs-filter .label-wrap, .logs-filter label {
   background: transparent !important;
@@ -837,15 +835,86 @@ button.primary, .primary button {
   border-radius: 8px !important;
 }
 .logs-filter input { border: 0 !important; }
-/* Strip Gradio's gray container around tabs + table */
-.logs-tabs, .logs-tabs > div, .logs-tabs .tabitem,
-.logs-tabs .tab-nav, .logs-card .compact-table, .logs-card .compact-table > div {
+/* Accordion panels for tables */
+.logs-accordion {
+  background: var(--sar-surface) !important;
+  border: 1px solid var(--sar-border) !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+  margin-bottom: 4px !important;
+}
+.logs-accordion .label-wrap,
+.logs-accordion button.label-wrap {
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  color: var(--sar-text) !important;
+  background: var(--sar-surface-soft) !important;
+  border-radius: 8px !important;
+  padding: 8px 12px !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+.logs-accordion .wrap-outer,
+.logs-accordion .wrap,
+.logs-accordion .gap {
+  background: var(--sar-surface) !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 8px 0 0 !important;
+}
+.logs-accordion .form,
+.logs-accordion .block.gradio-column {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+/* Strip Gradio's gray container around table */
+.logs-card .compact-table, .logs-card .compact-table > div {
   background: transparent !important;
   border: 0 !important;
   box-shadow: none !important;
 }
-.logs-tabs .tabitem { padding: 6px 0 0 !important; }
 .logs-card .compact-table table { border: 1px solid var(--sar-border) !important; border-radius: 8px !important; overflow: hidden !important; }
+
+/* HTML log tables (replaces gr.Dataframe to avoid Svelte 5 renderer freeze) */
+.log-table-container { background: transparent !important; border: 0 !important; box-shadow: none !important; padding: 0 !important; }
+.log-table-wrap { overflow-x: auto; width: 100%; }
+.log-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.log-table th { background: var(--sar-surface-soft); color: var(--sar-text); font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; padding: 6px 8px; border-bottom: 2px solid var(--sar-border); text-align: left; white-space: nowrap; }
+.log-table td { padding: 5px 8px; border-bottom: 1px solid var(--sar-border); color: var(--sar-text); vertical-align: middle; }
+.log-table tbody tr:last-child td { border-bottom: 0; }
+.log-table tbody tr:hover { background: var(--sar-surface-soft); }
+
+/* Gas warning banner — full-width, appears between header and page content */
+#gas-banner,
+#gas-banner.block,
+#gas-banner > .wrap {
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+.gas-warning-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 14px;
+  padding: 10px 14px;
+  background: #fff1f2;
+  border: 1.5px solid #fca5a5;
+  border-radius: 10px;
+  color: #991b1b;
+  font-size: 13px;
+  font-weight: 600;
+  animation: gas-pulse 1.5s ease-in-out infinite;
+}
+.gas-warning-icon { font-size: 20px; flex-shrink: 0; }
+.gas-warning-text strong { color: #7f1d1d; }
+@keyframes gas-pulse {
+  0%, 100% { border-color: #fca5a5; background: #fff1f2; }
+  50%       { border-color: #ef4444; background: #fee2e2; }
+}
 
 /* Export notice banner — temporary, compact, warning style */
 .export-banner-wrap { padding: 0 !important; background: transparent !important; border: 0 !important; }

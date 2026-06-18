@@ -19,7 +19,7 @@ _UI_COMPONENTS = {"touchscreen"}
 def status(services: AppServices = Depends(get_services)) -> dict[str, Any]:
     hw = services.hardware
     data = hw.status()
-    data["gas"] = hw.read_gas()
+    data["gas"] = hw.gas_status()   # cached — updated by gas-poll thread, no I2C here
     data["climate"] = hw.read_climate()
     return data
 

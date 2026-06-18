@@ -45,7 +45,7 @@ class YoloDetector(Detector):
 
     def infer(self, frame: np.ndarray, conf: float, iou: float) -> DetectionResult:
         results = self._model.predict(
-            source=frame,
+            source=frame[..., ::-1],  # RGB → BGR: YOLO expects BGR numpy arrays
             conf=conf,
             iou=iou,
             imgsz=self._img_size,

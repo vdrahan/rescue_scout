@@ -86,6 +86,29 @@ def get_recent_readings(limit: int) -> list[dict[str, Any]]:
             return [dict(r) for r in cur.fetchall()]
 
 
+def count_readings(sensor_name: str | None, dangerous_only: bool) -> int:
+    conditions: list[str] = []
+    params: list[Any] = []
+    if sensor_name:
+        conditions.append("s.sensor_name = %s")
+        params.append(sensor_name)
+    if dangerous_only:
+        conditions.append("sr.is_dangerous = TRUE")
+    where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+    with db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                f"""
+                SELECT COUNT(*)
+                FROM sensor_reading sr
+                JOIN sensor s ON sr.sensor_id = s.sensor_id
+                {where};
+                """,
+                params,
+            )
+            return cur.fetchone()[0]
+
+
 def get_reading_by_id(reading_id: int) -> dict[str, Any] | None:
     with db() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
@@ -110,11 +133,11 @@ def create_reading(
         with conn.cursor() as cur:
             cur.execute(
                 """
-                INSERT INTO sensor_reading (sensor_id, value, message, is_dangerous)
-                VALUES (%s, %s, %s, %s)
+                INSERT INTO sensor_reading (sensor_id, value, message, is_dangerous, reading_time)
+                VALUES (%s, %s, %s, %s, %s)
                 RETURNING reading_id, reading_time;
                 """,
-                (sensor_id, value, message, is_dangerous),
+                (sensor_id, value, message, is_dangerous, datetime.now()),
             )
             row = cur.fetchone()
         conn.commit()

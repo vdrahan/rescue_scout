@@ -188,5 +188,5 @@ with gr.Blocks(title="Frame Filter") as demo:
 
 
 if __name__ == "__main__":
-    demo.launch()
+    demo.launch(inbrowser=False)
 

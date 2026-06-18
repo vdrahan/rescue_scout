@@ -81,6 +81,8 @@ def test_hardware_status_and_tests(client):
     assert status["gas"]["ppm"] is not None
 
     assert client.post("/api/hardware/test/buzzer").json()["status"] == "passed"
+    assert client.post("/api/hardware/test/rgb_module").json()["status"] == "passed"
+    assert client.post("/api/hardware/test/rgb_status").json()["status"] == "passed"
     assert client.post("/api/hardware/test/detection_camera").json()["status"] == "passed"
     assert client.post("/api/hardware/test/touchscreen").json()["status"] == "passed"
     assert client.post("/api/hardware/test/camera_servo").json()["status"] == "skipped"

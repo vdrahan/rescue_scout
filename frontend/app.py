@@ -23,4 +23,5 @@ if __name__ == "__main__":
         css=CUSTOM_CSS,
         theme=gr.themes.Soft(primary_hue="orange", secondary_hue="blue", neutral_hue="slate"),
         allowed_paths=[str(ASSET_DIR)],
+        inbrowser=False,
     )

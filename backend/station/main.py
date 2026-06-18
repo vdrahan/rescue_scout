@@ -11,6 +11,7 @@ from . import __version__
 from .api import cameras, detection, hardware, health, status
 from .api.deps import AppServices
 from .cameras.manager import CameraManager
+from .cameras.reader import CameraReader
 from .config import get_settings
 from .detection.registry import build_detector
 from .detection.service import DetectionService
@@ -28,6 +29,8 @@ async def lifespan(app: FastAPI):
 
     hardware_mgr = HardwareManager(settings)
     camera_mgr = CameraManager(settings)
+    camera_reader = CameraReader(camera_mgr, settings)
+    camera_reader.start()
     sink = DataApiSink(settings)
     sink.start()
     bundle = build_detector(settings)
@@ -49,6 +52,7 @@ async def lifespan(app: FastAPI):
         yield
     finally:
         detection_svc.stop()
+        camera_reader.stop()
         sink.close()
         camera_mgr.close_all()
         hardware_mgr.cleanup()

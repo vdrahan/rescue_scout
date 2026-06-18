@@ -16,6 +16,7 @@ from .mock.devices import (
     MockGasSensor,
     MockLcd,
     MockLed,
+    MockRgbModule,
     MockRgbLed,
 )
 
@@ -29,7 +30,24 @@ COMPONENT_MAP = {
     "gas_sensor": "gas",
     "temp_humidity": "climate",
     "lcd_display": "lcd",
+    "rgb_module": "rgb_module",
+    "rgb_status": "rgb_status",
 }
+
+
+class UnavailableDevice(Device):
+    def __init__(self, dev_id: str, name: str, reason: str):
+        super().__init__(dev_id, name)
+        self.ok = False
+        self._reason = reason
+
+    def test(self) -> tuple[bool, str]:
+        return False, self._reason
+
+    def status(self) -> dict:
+        data = super().status()
+        data["error"] = self._reason
+        return data
 
 
 class HardwareManager:
@@ -39,6 +57,10 @@ class HardwareManager:
         self.note = ""
         self.mode = "mock"
         self._devices: dict[str, Device] = {}
+        # Cache updated exclusively by the gas-poll background thread.
+        # The HTTP status endpoint reads this instead of touching I2C directly,
+        # which eliminates the smbus2 race condition.
+        self._gas_cache: dict = {"ppm": None, "dangerous": False}
         self._build()
 
     # -- construction -------------------------------------------------------
@@ -48,21 +70,20 @@ class HardwareManager:
             self._devices = self._build_mock()
             self.mode = "mock"
             return
-        try:
-            self._devices = self._build_real()
-            self.mode = "real"
-        except Exception as exc:  # noqa: BLE001
-            self._devices = self._build_mock()
-            self.mode = "mock"
+
+        self._devices, failures, real_count = self._build_real(want)
+        self.mode = "real" if want == "real" or real_count else "mock"
+        if failures:
             self.degraded = True
-            self.note = f"real hardware unavailable: {exc}"
+            self.note = "; ".join(failures)
             level = log.error if want == "real" else log.warning
-            level("HARDWARE_MODE=%s falling back to mock: %s", want, exc)
+            level("HARDWARE_MODE=%s degraded: %s", want, self.note)
 
     def _build_mock(self) -> dict[str, Device]:
         return {
             "system_led": MockLed("system_led", "System LED"),
             "detection_led": MockLed("detection_led", "Detection LED"),
+            "rgb_module": MockRgbModule("rgb_module", "Digital RGB Module"),
             "rgb_status": MockRgbLed("rgb_status", "Status RGB"),
             "buzzer": MockBuzzer("buzzer", "Buzzer"),
             "gas": MockGasSensor("gas", "Gas Sensor MQ-2"),
@@ -72,27 +93,98 @@ class HardwareManager:
             "lcd": MockLcd("lcd", "LCD Display"),
         }
 
-    def _build_real(self) -> dict[str, Device]:
+    def _build_real(self, want: str) -> tuple[dict[str, Device], list[str], int]:
         s = self._settings
-        # Lazy imports: missing libs raise here and trigger mock fallback.
-        from .real.ads1115_gas import Ads1115GasSensor
-        from .real.dht_sensor import DhtClimateSensor
-        from .real.gpio_devices import GpioBuzzer, GpioButton, GpioLed, GpioRgbLed
-        from .real.lcd_display import I2cLcd
+        devices = self._build_mock()
+        failures: list[str] = []
+        real_count = 0
 
-        return {
-            "system_led": GpioLed("system_led", "System LED", s.system_led_pin),
-            "detection_led": GpioLed("detection_led", "Detection LED", s.detection_led_pin),
-            "rgb_status": GpioRgbLed("rgb_status", "Status RGB",
-                                     s.rgb2_r_pin, s.rgb2_g_pin, s.rgb2_b_pin),
-            "buzzer": GpioBuzzer("buzzer", "Buzzer", s.buzzer_pin),
-            "gas": Ads1115GasSensor("gas", "Gas Sensor MQ-2",
-                                    s.ads1115_i2c_addr, s.mq2_channel),
-            "climate": DhtClimateSensor("climate", "DHT11 Temp/Humidity", s.dht_pin),
-            "button_page": GpioButton("button_page", "Display Page Button", s.button_page_pin),
-            "button_camera": GpioButton("button_camera", "Camera Switch Button", s.button_camera_pin),
-            "lcd": I2cLcd("lcd", "LCD Display", s.lcd_i2c_addr, s.lcd_i2c_bus),
-        }
+        def add(dev_id: str, name: str, factory) -> None:
+            nonlocal real_count
+            try:
+                devices[dev_id] = factory()
+                real_count += 1
+            except Exception as exc:  # noqa: BLE001
+                reason = f"{name}: {exc}"
+                failures.append(reason)
+                if want == "real":
+                    devices[dev_id] = UnavailableDevice(dev_id, name, reason)
+
+        try:
+            from .real.gpio_devices import (
+                GpioBuzzer,
+                GpioButton,
+                GpioLed,
+                GpioRgbLed,
+                GpioRgbModule,
+            )
+        except Exception as exc:  # noqa: BLE001
+            reason = f"GPIO devices unavailable: {exc}"
+            failures.append(reason)
+            if want == "real":
+                for dev_id, name in (
+                    ("system_led", "System LED"),
+                    ("detection_led", "Detection LED"),
+                    ("rgb_module", "Digital RGB Module"),
+                    ("rgb_status", "Status RGB"),
+                    ("buzzer", "Buzzer"),
+                    ("button_page", "Display Page Button"),
+                    ("button_camera", "Camera Switch Button"),
+                ):
+                    devices[dev_id] = UnavailableDevice(dev_id, name, reason)
+        else:
+            add("system_led", "System LED",
+                lambda: GpioLed("system_led", "System LED", s.system_led_pin, s.gpio_chip))
+            add("detection_led", "Detection LED",
+                lambda: GpioLed("detection_led", "Detection LED", s.detection_led_pin, s.gpio_chip))
+            add("rgb_module", "Digital RGB Module",
+                lambda: GpioRgbModule("rgb_module", "Digital RGB Module",
+                                      s.rgb1_r_pin, s.rgb1_g_pin, s.rgb1_b_pin, s.gpio_chip))
+            add("rgb_status", "Status RGB",
+                lambda: GpioRgbLed("rgb_status", "Status RGB",
+                                   s.rgb2_r_pin, s.rgb2_g_pin, s.rgb2_b_pin, s.gpio_chip))
+            add("buzzer", "Buzzer",
+                lambda: GpioBuzzer("buzzer", "Buzzer", s.buzzer_pin, s.gpio_chip))
+            add("button_page", "Display Page Button",
+                lambda: GpioButton("button_page", "Display Page Button", s.button_page_pin, s.gpio_chip))
+            add("button_camera", "Camera Switch Button",
+                lambda: GpioButton("button_camera", "Camera Switch Button", s.button_camera_pin, s.gpio_chip))
+
+        try:
+            from .real.ads1115_gas import Ads1115GasSensor
+        except Exception as exc:  # noqa: BLE001
+            reason = f"Gas Sensor MQ-2: {exc}"
+            failures.append(reason)
+            if want == "real":
+                devices["gas"] = UnavailableDevice("gas", "Gas Sensor MQ-2", reason)
+        else:
+            add("gas", "Gas Sensor MQ-2",
+                lambda: Ads1115GasSensor("gas", "Gas Sensor MQ-2",
+                                         s.ads1115_i2c_addr, s.mq2_channel))
+
+        try:
+            from .real.dht_sensor import DhtClimateSensor
+        except Exception as exc:  # noqa: BLE001
+            reason = f"DHT11 Temp/Humidity: {exc}"
+            failures.append(reason)
+            if want == "real":
+                devices["climate"] = UnavailableDevice("climate", "DHT11 Temp/Humidity", reason)
+        else:
+            add("climate", "DHT11 Temp/Humidity",
+                lambda: DhtClimateSensor("climate", "DHT11 Temp/Humidity", s.dht_pin))
+
+        try:
+            from .real.lcd_display import I2cLcd
+        except Exception as exc:  # noqa: BLE001
+            reason = f"LCD Display: {exc}"
+            failures.append(reason)
+            if want == "real":
+                devices["lcd"] = UnavailableDevice("lcd", "LCD Display", reason)
+        else:
+            add("lcd", "LCD Display",
+                lambda: I2cLcd("lcd", "LCD Display", s.lcd_i2c_addr, s.lcd_i2c_bus))
+
+        return devices, failures, real_count
 
     # -- queries ------------------------------------------------------------
     def status(self) -> dict:
@@ -110,6 +202,14 @@ class HardwareManager:
             return None  # not a hardware device — caller handles (camera/UI)
         try:
             passed, detail = device.test()
+            if passed and component == "temp_humidity" and isinstance(device, ClimateSensor):
+                try:
+                    temperature, humidity = device.read()
+                    lcd = self._devices.get("lcd")
+                    if isinstance(lcd, Lcd):
+                        lcd.write([f"Temp:{temperature}C", f"Hum:{humidity}%"])
+                except Exception as exc:  # noqa: BLE001
+                    detail = f"{detail}; LCD update failed: {exc}"
         except Exception as exc:  # noqa: BLE001
             return {"component": component, "status": "failed", "detail": str(exc)}
         return {"component": component, "status": "passed" if passed else "failed",
@@ -122,16 +222,28 @@ class HardwareManager:
             led.on() if active else led.off()
 
     def alert(self) -> None:
+        """Person detection alert: 2 short beeps."""
         buzzer = self._devices.get("buzzer")
         if isinstance(buzzer, Buzzer):
-            buzzer.beep(times=2)
+            buzzer.beep(times=2, on=0.1, off=0.05)
+
+    def gas_alert(self) -> None:
+        """Gas warning alert: 5 rapid beeps — clearly distinct from person detection."""
+        buzzer = self._devices.get("buzzer")
+        if isinstance(buzzer, Buzzer):
+            buzzer.beep(times=5, on=0.08, off=0.06)
 
     def read_gas(self) -> dict:
+        """Read sensor and update cache. Called only from the gas-poll thread."""
         gas = self._devices.get("gas")
         if isinstance(gas, GasSensor):
             ppm = gas.read_ppm()
-            return {"ppm": ppm, "dangerous": ppm >= self._settings.gas_danger_ppm}
-        return {"ppm": None, "dangerous": False}
+            self._gas_cache = {"ppm": ppm, "dangerous": ppm >= self._settings.gas_danger_ppm}
+        return self._gas_cache
+
+    def gas_status(self) -> dict:
+        """Return last cached gas reading — safe to call from any thread, no I2C."""
+        return self._gas_cache
 
     def read_climate(self) -> dict:
         climate = self._devices.get("climate")

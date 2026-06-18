@@ -52,8 +52,10 @@ class Settings(BaseSettings):
     usb_camera_index: int = 0
     frame_width: int = 640
     frame_height: int = 480
+    camera_read_fps: float = 15.0  # how fast the CameraReader background thread captures
 
     # --- Hardware pins (BCM) — defaults from tests/test.py wiring ---
+    gpio_chip: int = 0
     buzzer_pin: int = 5
     system_led_pin: int = 23     # LED1
     detection_led_pin: int = 17  # LED2
@@ -68,9 +70,9 @@ class Settings(BaseSettings):
     dht_pin: int = 25
 
     # I2C
-    ads1115_i2c_addr: int = 0x48
+    ads1115_i2c_addr: int = 0x4b
     mq2_channel: int = 0
-    gas_danger_ppm: float = 250.0
+    gas_danger_ppm: float = 20.0
     lcd_i2c_addr: int = 0x27
     lcd_i2c_bus: int = 1
 

@@ -14,7 +14,7 @@ from typing import Any
 
 import httpx
 
-from .config import API_URL, BACKEND_COOLDOWN_SECONDS, REQUEST_TIMEOUT, STATION_URL
+from .config import API_URL, BACKEND_COOLDOWN_SECONDS, HARDWARE_TEST_TIMEOUT, REQUEST_TIMEOUT, STATION_URL
 
 log = logging.getLogger(__name__)
 
@@ -162,7 +162,13 @@ def hardware_status() -> dict | None:
 
 
 def test_component(component: str) -> dict | None:
-    return _json("station", _station, "POST", f"/api/hardware/test/{component}")
+    return _json(
+        "station",
+        _station,
+        "POST",
+        f"/api/hardware/test/{component}",
+        timeout=HARDWARE_TEST_TIMEOUT,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -189,6 +195,16 @@ def sensor_readings(sensor_name: str | None = None, dangerous_only: bool = False
     if sensor_name:
         params["sensor_name"] = sensor_name
     return _json("api", _api, "GET", "/sensor-readings", params=params)
+
+
+def sensor_readings_count(sensor_name: str | None = None, dangerous_only: bool = False) -> int | None:
+    params: dict[str, Any] = {"dangerous_only": dangerous_only}
+    if sensor_name:
+        params["sensor_name"] = sensor_name
+    result = _json("api", _api, "GET", "/sensor-readings/count", params=params)
+    if result is None:
+        return None
+    return result.get("count")
 
 
 def events(limit: int = 50) -> list[dict] | None:

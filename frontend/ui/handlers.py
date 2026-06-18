@@ -137,6 +137,38 @@ def current_clock() -> str:
     return f"`{datetime.now().strftime('%H:%M:%S  |  %d %b %Y')}`"
 
 
+_GAS_ALERT_WINDOW_SECONDS = 30
+
+
+def gas_banner_html() -> str:
+    """Show warning if a dangerous gas reading was recorded in the last 30 seconds.
+
+    Reads from the data-api DB (not the live station endpoint) so the banner is
+    immune to station circuit-breaker trips and real-time polling timing gaps.
+    """
+    try:
+        rows = api_client.sensor_readings(sensor_name="gas", dangerous_only=True, limit=1)
+        if not rows:
+            return '<div id="gas-banner-inner" style="display:none"></div>'
+        latest = rows[0]
+        reading_time = datetime.fromisoformat(latest["reading_time"])
+        age = (datetime.now() - reading_time).total_seconds()
+        if age > _GAS_ALERT_WINDOW_SECONDS:
+            return '<div id="gas-banner-inner" style="display:none"></div>'
+        ppm = float(latest["value"])
+    except Exception:  # noqa: BLE001
+        return '<div id="gas-banner-inner" style="display:none"></div>'
+
+    ppm_text = f"{ppm:.0f} ppm"
+    return f"""<div id="gas-banner-inner" class="gas-warning-banner">
+  <span class="gas-warning-icon">⚠️</span>
+  <span class="gas-warning-text">
+    <strong>Gas Detected</strong> — MQ-2 reads {ppm_text}.
+    Ventilate the area immediately and keep personnel away.
+  </span>
+</div>"""
+
+
 def page_updates(page: str) -> tuple[Any, ...]:
     selected = page if page in PAGE_DETAILS else DEFAULT_PAGE
     details = PAGE_DETAILS[selected]
@@ -453,18 +485,55 @@ def gas_alert_rows() -> list[list[str]]:
     return [_format_gas_row(r) for r in rows]
 
 
+def _rows_to_html(headers: list[str], rows: list[list[str]]) -> str:
+    import html as _html
+    ths = "".join(f"<th>{_html.escape(h)}</th>" for h in headers)
+    trs = "".join(
+        "<tr>" + "".join(f"<td>{_html.escape(str(c))}</td>" for c in row) + "</tr>"
+        for row in rows
+    )
+    return (
+        "<div class='log-table-wrap'>"
+        f"<table class='log-table'><thead><tr>{ths}</tr></thead><tbody>{trs}</tbody></table>"
+        "</div>"
+    )
+
+
+def detection_events_html(class_filter: str) -> str:
+    from .constants import DETECTION_HEADERS
+    return _rows_to_html(DETECTION_HEADERS, filter_detection_events(class_filter))
+
+
+def system_events_html() -> str:
+    from .constants import SYSTEM_EVENT_HEADERS
+    return _rows_to_html(SYSTEM_EVENT_HEADERS, system_event_rows())
+
+
+def gas_alerts_html() -> str:
+    from .constants import GAS_ALERT_HEADERS
+    return _rows_to_html(GAS_ALERT_HEADERS, gas_alert_rows())
+
+
+def gas_kpi_card_html() -> str:
+    """Return just the Gas Alerts metric_html string — single COUNT query, no pagination cap."""
+    count = api_client.sensor_readings_count(sensor_name="gas", dangerous_only=True)
+    if count is None:
+        return metric_html("Gas Alerts", "—", "Danger readings", YELLOW)
+    value = str(count) if count else "No data yet"
+    return metric_html("Gas Alerts", value, "Danger readings", YELLOW)
+
+
 def data_kpi_cards() -> list[tuple[str, str, str, str]]:
+    """Returns first 3 KPI cards (static). Gas Alerts card is built by gas_kpi_card_html()."""
     stats = api_client.detection_stats()
     latest = api_client.detections(limit=1)
     events = api_client.events(limit=50)
-    gas_alerts = api_client.sensor_readings(sensor_name="gas", dangerous_only=True, limit=50)
 
-    if any(value is None for value in (stats, latest, events, gas_alerts)):
+    if any(value is None for value in (stats, latest, events)):
         return [
             ("Total Detections", "Backend unavailable", "Data API", RED),
             ("Last Detection", "Backend unavailable", "Data API", RED),
             ("System Events", "Backend unavailable", "Data API", RED),
-            ("Gas Alerts", "Backend unavailable", "Data API", RED),
         ]
 
     total = int(stats.get("total") or 0)
@@ -474,7 +543,6 @@ def data_kpi_cards() -> list[tuple[str, str, str, str]]:
         ("Last Detection", _canonical_class(last["class_name"]) if last else "No data yet",
          str(last.get("detection_time", ""))[:19] if last else "No saved detection", PURPLE),
         ("System Events", str(len(events)) if events else "No data yet", "Recent event log", BLUE),
-        ("Gas Alerts", str(len(gas_alerts)) if gas_alerts else "No data yet", "Danger readings", YELLOW),
     ]
 
 
@@ -610,7 +678,15 @@ def data_timeline_figure() -> go.Figure:
     return fig
 
 
-def gas_history_figure() -> go.Figure:
+# Throttle: rebuild chart data from DB at most once per interval
+_CHART_INTERVAL = 5.0
+_gas_fig_cache: go.Figure | None = None
+_dist_fig_cache: go.Figure | None = None
+_gas_fig_last_rebuild: float = 0.0
+_dist_fig_last_rebuild: float = 0.0
+
+
+def _build_gas_history_figure() -> go.Figure:
     rows = api_client.stat_sensor_over_time("gas", "minute")
     result = api_client.service_result(rows, "Backend unavailable")
     if not result.available or not result.has_data:
@@ -622,13 +698,26 @@ def gas_history_figure() -> go.Figure:
     fig = _base_figure("Gas Sensor History")
     fig.add_bar(x=times, y=values, marker_color=YELLOW, name="Gas ppm")
     if times:
-        fig.add_scatter(x=times, y=[250] * len(times), mode="lines", line={"color": RED, "dash": "dot"}, name="Danger")
+        fig.add_scatter(x=times, y=[250] * len(times), mode="lines",
+                        line={"color": RED, "dash": "dot"}, name="Danger")
     fig.update_layout(height=280)
     fig.update_yaxes(title_text="ppm", title_font={"size": 14}, tickfont={"size": 13})
     return fig
 
 
-def class_distribution_figure() -> go.Figure:
+def gas_history_figure() -> go.Figure:
+    global _gas_fig_cache, _gas_fig_last_rebuild
+    now = time.time()
+    if now - _gas_fig_last_rebuild >= _CHART_INTERVAL:
+        _gas_fig_last_rebuild = now
+        _gas_fig_cache = _build_gas_history_figure()
+    fig = _gas_fig_cache or _build_gas_history_figure()
+    # Unique meta forces Gradio to always send a WebSocket update to the browser
+    fig.update_layout(meta={"ts": now})
+    return fig
+
+
+def _build_class_distribution_figure() -> go.Figure:
     rows = api_client.stat_class_distribution()
     result = api_client.service_result(rows, "Backend unavailable")
     if not result.available or not result.has_data:
@@ -658,6 +747,17 @@ def class_distribution_figure() -> go.Figure:
     )
     return fig
 
+
+def class_distribution_figure() -> go.Figure:
+    global _dist_fig_cache, _dist_fig_last_rebuild
+    now = time.time()
+    if now - _dist_fig_last_rebuild >= _CHART_INTERVAL:
+        _dist_fig_last_rebuild = now
+        _dist_fig_cache = _build_class_distribution_figure()
+    fig = _dist_fig_cache or _build_class_distribution_figure()
+    fig.update_layout(meta={"ts": now})
+    return fig
+
 def statistics_status(data_source: str, chart_type: str) -> str:
     return f"Showing **{data_source}** as a **{chart_type}** chart from the data API."
 
@@ -676,6 +776,8 @@ _TEST_ICONS: dict[str, str] = {
     "detection_led":    "💡",
     "buzzer":           "🔔",
     "system_led":       "🟢",
+    "rgb_module":       "🎛",
+    "rgb_status":       "🌈",
     "camera_servo":     "🔧",
 }
 
@@ -687,6 +789,8 @@ def test_header_html(test: dict, status: str) -> str:
         badge = "<span class='ts-passed' style='color:#10b981;font-size:15px;font-weight:700'>✓</span>"
     elif status == "failed":
         badge = "<span class='ts-failed' style='color:#ef4444;font-size:15px;font-weight:700'>✗</span>"
+    elif status == "skipped":
+        badge = "<span class='ts-skipped' style='color:#f59e0b;font-size:15px;font-weight:700'>!</span>"
     else:
         badge = "<span class='ts-none'></span>"
     return (
@@ -698,8 +802,9 @@ def test_header_html(test: dict, status: str) -> str:
     )
 
 
-def test_rows_html(test: dict, status: str) -> str:
+def test_rows_html(test: dict, status: str, detail: str = "") -> str:
     rows = ""
+    safe_detail = html.escape(detail) if detail else ""
     for label, expected in test["checks"]:
         if status == "not_tested":
             actual = "<span style='color:#94a3b8;font-size:11px'>not tested</span>"
@@ -707,6 +812,8 @@ def test_rows_html(test: dict, status: str) -> str:
             actual = (
                 f"<span style='color:#10b981;font-size:11px;font-weight:600'>{expected} ✓</span>"
             )
+        elif status == "skipped":
+            actual = "<span style='color:#f59e0b;font-size:11px;font-weight:600'>Skipped !</span>"
         else:
             actual = "<span style='color:#ef4444;font-size:11px;font-weight:600'>Error ✗</span>"
         rows += (
@@ -714,6 +821,12 @@ def test_rows_html(test: dict, status: str) -> str:
             f"<span style='font-size:11px;color:#64748b;flex:1'>{label}</span>"
             f"<span style='font-size:11px;color:#cbd5e1;margin-right:10px'>{expected}</span>"
             f"{actual}</div>"
+        )
+    if safe_detail and status in {"failed", "skipped"}:
+        rows += (
+            "<div style='margin-top:6px;padding:6px 8px;border-radius:6px;"
+            "background:#fef2f2;border:1px solid #fecaca;color:#991b1b;"
+            f"font-size:11px;line-height:1.35'>{safe_detail}</div>"
         )
     return f"<div style='margin-top:7px'>{rows}</div>"
 
@@ -842,26 +955,35 @@ def diagnostic_summary_html(state: dict[str, str] | None) -> str:
 def diagnostic_progress(state: dict[str, str] | None) -> str:
     state = state or initial_test_state()
     passed = sum(1 for value in state.values() if value == "passed")
-    return f"### Component Tests\n{passed}/{len(TEST_IDS)} tested"
+    completed = sum(1 for value in state.values() if value != "not_tested")
+    return f"### Component Tests\n{completed}/{len(TEST_IDS)} run - {passed} passed"
 
 
 def _component_status(test_id: str) -> str:
     """Run a real station hardware self-test."""
+    status, _detail = _component_result(test_id)
+    return status
+
+
+def _component_result(test_id: str) -> tuple[str, str]:
     result = api_client.test_component(test_id)
     if result is None:
-        return "failed"
-    return "passed" if result.get("status") in ("passed", "skipped") else "failed"
+        return "failed", "Station hardware API unavailable"
+    status = str(result.get("status") or "failed")
+    if status not in {"passed", "failed", "skipped"}:
+        status = "failed"
+    return status, str(result.get("detail") or "")
 
 
 def run_single_test(state: dict[str, str] | None, test_id: str) -> tuple[Any, ...]:
     next_state = dict(state or initial_test_state())
-    status = _component_status(test_id)
+    status, detail = _component_result(test_id)
     next_state[test_id] = status
     t = TEST_LOOKUP[test_id]
     return (
         next_state,
         test_header_html(t, status),
-        test_rows_html(t, status),
+        test_rows_html(t, status, detail),
         diagnostic_summary_html(next_state),
         diagnostic_progress(next_state),
     )
@@ -871,11 +993,11 @@ def run_all_tests(state: dict[str, str] | None) -> tuple[Any, ...]:
     next_state: dict[str, str] = {}
     pairs: list[str] = []
     for tid in TEST_IDS:
-        status = _component_status(tid)
+        status, detail = _component_result(tid)
         next_state[tid] = status
         t = TEST_LOOKUP[tid]
         pairs.append(test_header_html(t, status))
-        pairs.append(test_rows_html(t, status))
+        pairs.append(test_rows_html(t, status, detail))
     return (next_state, *pairs, diagnostic_summary_html(next_state), diagnostic_progress(next_state))
 
 
@@ -931,8 +1053,11 @@ def wire_operating_page(operating: Any, nav: gr.Radio) -> None:
 
 
 def wire_data_logs_page(data_logs: Any) -> None:
-    data_logs.class_filter.change(fn=filter_detection_events, inputs=[data_logs.class_filter], outputs=[data_logs.detection_table], show_progress="hidden")
+    data_logs.class_filter.change(fn=detection_events_html, inputs=[data_logs.class_filter], outputs=[data_logs.detection_table], show_progress="hidden")
     data_logs.export_button.click(fn=export_log_message, inputs=None, outputs=[data_logs.export_banner], show_progress="hidden")
+    # Refresh gas table and gas KPI when class filter changes (user is actively on the page)
+    data_logs.class_filter.change(fn=gas_alerts_html, inputs=None, outputs=[data_logs.gas_table], show_progress="hidden")
+    data_logs.class_filter.change(fn=gas_kpi_card_html, inputs=None, outputs=[data_logs.gas_kpi], show_progress="hidden")
 
 
 def wire_statistics_page(statistics: Any) -> None:
@@ -985,6 +1110,7 @@ def wire_callbacks(layout: Any) -> None:
         show_progress="hidden",
     )
     layout.timer.tick(fn=current_clock, inputs=None, outputs=[layout.clock], show_progress="hidden")
+    layout.timer.tick(fn=gas_banner_html, inputs=None, outputs=[layout.gas_banner], show_progress="hidden")
     layout.timer.tick(
         fn=live_operating,
         inputs=[
@@ -1007,3 +1133,42 @@ def wire_callbacks(layout: Any) -> None:
     wire_data_logs_page(layout.data_logs)
     wire_statistics_page(layout.statistics)
     wire_debugging_page(layout.debugging)
+
+    def _refresh_gas_kpi(nav: str) -> Any:
+        if nav != "Data":
+            return gr.update()
+        return gas_kpi_card_html()
+
+    layout.timer.tick(
+        fn=_refresh_gas_kpi,
+        inputs=[layout.nav],
+        outputs=[layout.data_logs.gas_kpi],
+        show_progress="hidden",
+    )
+
+    def _refresh_gas_table(nav: str) -> Any:
+        if nav != "Data":
+            return gr.update()
+        return gas_alerts_html()
+
+    layout.timer.tick(
+        fn=_refresh_gas_table,
+        inputs=[layout.nav],
+        outputs=[layout.data_logs.gas_table],
+        show_progress="hidden",
+    )
+
+    layout.timer.tick(
+        fn=gas_history_figure,
+        inputs=None,
+        outputs=[layout.data_logs.gas_history_plot],
+        show_progress="hidden",
+    )
+
+    layout.timer.tick(
+        fn=class_distribution_figure,
+        inputs=None,
+        outputs=[layout.data_logs.class_dist_plot],
+        show_progress="hidden",
+    )
+

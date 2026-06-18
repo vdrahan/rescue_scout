@@ -35,7 +35,7 @@ def status(services: AppServices = Depends(get_services)) -> dict[str, Any]:
         "hardware": {
             "mode": hw.mode,
             "degraded": hw.degraded,
-            "gas": hw.read_gas(),
+            "gas": hw.gas_status(),
             "climate": hw.read_climate(),
         },
         "sink": {
