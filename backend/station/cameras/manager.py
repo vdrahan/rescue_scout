@@ -18,10 +18,12 @@ class CameraManager:
     def __init__(self, settings: Settings):
         self._settings = settings
         self._lock = threading.Lock()
-        self._cache: np.ndarray | None = None
+        self._caches: dict[str, np.ndarray | None] = {}
         self.degraded = False
         self._cameras = self._build()
         self._active_id = next(iter(self._cameras))
+        for cam_id in self._cameras:
+            self._caches[cam_id] = None
 
     # -- construction -------------------------------------------------------
     def _build(self) -> dict[str, CameraSource]:
@@ -43,12 +45,8 @@ class CameraManager:
         has_rtsp = bool(rtsp_url)
         has_usb = usb_index is not None
 
-        # No real source configured at all → synthetic feed.
         if not has_rtsp and not has_usb:
             return MockCamera(cam_id, name, w, h)
-        # Camera source is decoupled from the detector: a configured RTSP URL
-        # streams real video even when DETECTION_MODE=mock. USB is reserved for
-        # real/auto modes so a laptop in mock mode never grabs a local webcam.
         if force_mock and not has_rtsp:
             return MockCamera(cam_id, name, w, h)
         try:
@@ -58,8 +56,6 @@ class CameraManager:
                 else UsbCamera(cam_id, name, usb_index)
             if cam.status == "error":
                 self.degraded = True
-                # In real mode, or whenever a real RTSP URL is configured, keep
-                # the real source visible as error instead of pretending with mock.
                 if self._settings.detection_mode == "real" or has_rtsp:
                     return cam
                 raise RuntimeError("camera failed to open")
@@ -83,42 +79,66 @@ class CameraManager:
     def active_id(self) -> str:
         return self._active_id
 
+    def secondary_ids(self) -> list[str]:
+        """IDs of all cameras that are not currently active."""
+        active = self._active_id
+        return [k for k in self._cameras if k != active]
+
+    def inference_source_id(self) -> str:
+        """Camera that always supplies frames for AI inference, regardless of active camera."""
+        return "detection"
+
+    def read_inference(self) -> np.ndarray | None:
+        """Return the latest cached frame from the detection camera (non-blocking)."""
+        with self._lock:
+            return self._caches.get("detection")
+
     def set_active(self, cam_id: str) -> bool:
         if cam_id not in self._cameras:
             return False
         with self._lock:
             self._active_id = cam_id
-            self._cache = None
+            # Keep existing cache — don't blank the screen during the handover
         return True
 
     def capture_active(self) -> np.ndarray | None:
-        """Read a fresh frame from the active camera and refresh the cache.
+        """Read a fresh frame from the active camera and update its cache.
 
-        The background :class:`CameraReader` is the only caller, so one thread
-        owns the underlying ``VideoCapture`` and the HTTP layer never blocks on a
-        camera read nor races a second reader on the same capture.
+        The background CameraReader is the only caller.
         """
-        cam = self._cameras[self._active_id]
+        return self._capture(self._active_id)
+
+    def capture_camera(self, cam_id: str) -> np.ndarray | None:
+        """Read a fresh frame from any camera and update its cache.
+
+        Used by CameraReader to keep non-active cameras alive.
+        """
+        return self._capture(cam_id)
+
+    def _capture(self, cam_id: str) -> np.ndarray | None:
+        cam = self._cameras.get(cam_id)
+        if cam is None:
+            return None
         frame = cam.read()
         with self._lock:
             if frame is not None:
-                self._cache = frame
+                self._caches[cam_id] = frame
             elif cam.status == "error":
-                self._cache = None  # source errored — drop the stale frame
+                self._caches[cam_id] = None
         return frame
 
     def read_active(self) -> np.ndarray | None:
-        """Non-blocking: the latest cached frame (populated by the reader)."""
+        """Non-blocking: latest cached frame for the active camera."""
         return self.cached()
 
     def read_one(self, cam_id: str) -> np.ndarray | None:
-        """Read a single frame from a specific camera (used for previews)."""
-        cam = self._cameras.get(cam_id)
-        return cam.read() if cam is not None else None
+        """Return the last cached frame for a camera — never blocks."""
+        with self._lock:
+            return self._caches.get(cam_id)
 
     def cached(self) -> np.ndarray | None:
         with self._lock:
-            return self._cache
+            return self._caches.get(self._active_id)
 
     def close_all(self) -> None:
         for cam in self._cameras.values():

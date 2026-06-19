@@ -7,6 +7,7 @@ Refactored from the proven inference logic in ``backend/model/model.py``.
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 
 import numpy as np
@@ -31,6 +32,11 @@ class YoloDetector(Detector):
         self._device = 0 if torch.cuda.is_available() else "cpu"
         self._half = bool(torch.cuda.is_available())
 
+        # Limit CPU threads to avoid current spikes that cause touchscreen brownouts
+        if not torch.cuda.is_available():
+            torch.set_num_threads(1)
+            torch.set_num_interop_threads(1)
+
         path = Path(model_path)
         if not path.exists():
             raise FileNotFoundError(f"YOLOv26 weights not found: {path}")
@@ -40,6 +46,8 @@ class YoloDetector(Detector):
         self._names = dict(self._model.names)
 
     def warmup(self) -> None:
+        # Give the power converter time to stabilise before the first heavy inference
+        time.sleep(2)
         dummy = np.zeros((self._img_size, self._img_size, 3), dtype=np.uint8)
         self.infer(dummy, conf=0.25, iou=0.45)
 

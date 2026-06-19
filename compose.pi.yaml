@@ -16,11 +16,17 @@ services:
       RTSP_CAMERA_1_URL: ${RTSP_CAMERA_1_URL:-}
       RTSP_CAMERA_2_URL: ${RTSP_CAMERA_2_URL:-}
       CONF_THRESHOLD: ${CONF_THRESHOLD:-0.45}
-      TARGET_FPS: ${TARGET_FPS:-8}
-      IMG_SIZE: ${IMG_SIZE:-320}
+      TARGET_FPS: ${TARGET_FPS:-4}
+      IMG_SIZE: ${IMG_SIZE:-160}
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
     devices:
       - "/dev/gpiochip0:/dev/gpiochip0"
       - "/dev/i2c-1:/dev/i2c-1"           
     volumes:
       # Drop your trained weights at ${MODEL_DIR}/best.pt on the host.
       - ${MODEL_DIR:-./backend/model/weights}:/models:ro
+
+  frontend: {}

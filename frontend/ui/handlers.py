@@ -212,7 +212,7 @@ def page_updates(page: str) -> tuple[Any, ...]:
 
 
 def metric_html(label: str, value: str, note: str, color: str = ORANGE) -> str:
-    font_size = "16px" if len(value) > 10 else "24px"
+    font_size = "18px" if len(value) > 10 else "30px"
     return (
         f"<div class='metric-label'>{label}</div>"
         f"<div class='metric-value' style='color:{color};font-size:{font_size}'>{value}</div>"
@@ -231,6 +231,7 @@ def threshold_head_html(value: float) -> str:
         f"<span class='op-threshold-value'>{int(value)}%</span>"
         "</div>"
     )
+
 
 
 def camera_status_html(message: str, tone: str = "neutral") -> str:
@@ -335,7 +336,6 @@ def recent_detections_html(rows: list, empty_message: str = "No detections yet")
 
 
 def operating_update(ai_enabled: bool, camera_mode: str, threshold: float) -> tuple[Any, ...]:
-    """Live Operating-page snapshot from the station."""
     cam_id = _camera_id(camera_mode)
     latest = api_client.detection_latest()
     status = api_client.station_status()
@@ -344,28 +344,27 @@ def operating_update(ai_enabled: bool, camera_mode: str, threshold: float) -> tu
         return (
             None,
             camera_status_html("Station unavailable", "error"),
-            0,
-            0,
-            "Station unavailable",
+            0, 0, "Station unavailable",
             recent_detections_html([], "Station unavailable"),
         )
 
     camera_info = _camera_info(cam_id, status)
     frame = api_client.camera_frame(cam_id)
+
     if camera_info.get("status") == "error":
         detail = html.escape(str(camera_info.get("last_error") or "camera signal unavailable"))
-        camera_status = camera_status_html(f"Camera unavailable - {detail}", "error")
+        cam_status = camera_status_html(f"Camera unavailable - {detail}", "error")
     elif frame is None:
-        camera_status = camera_status_html("No frame available", "warning")
+        cam_status = camera_status_html("No frame available", "warning")
     else:
         active_camera = (status or {}).get("cameras", {}).get("active", cam_id)
-        camera_status = camera_status_html(f"Camera live - {_camera_name(active_camera)}", "ok")
+        cam_status = camera_status_html(f"Camera live - {_camera_name(active_camera)}", "ok")
 
     recent = _latest_recent_rows(latest or {})
     detection_count = len((latest or {}).get("detections") or [])
     fps = round(float((latest or {}).get("fps") or 0), 1)
     duration = _format_uptime((status or {}).get("uptime_seconds"))
-    return frame, camera_status, detection_count, fps, duration, recent_detections_html(recent)
+    return frame, cam_status, detection_count, fps, duration, recent_detections_html(recent)
 
 
 def live_operating(page: str, ai_enabled: bool, camera_mode: str, threshold: float) -> tuple[Any, ...]:
@@ -373,6 +372,14 @@ def live_operating(page: str, ai_enabled: bool, camera_mode: str, threshold: flo
     if page != "Operating":
         return tuple(gr.update() for _ in range(6))
     return operating_update(ai_enabled, camera_mode, threshold)
+
+
+def live_camera_frame(page: str, camera_mode: str) -> Any:
+    """Fast camera-only refresh — single HTTP call, no stats overhead."""
+    if page != "Operating":
+        return gr.update()
+    cam_id = _camera_id(camera_mode)
+    return api_client.camera_frame(cam_id)
 
 
 def apply_threshold(ai_enabled: bool, camera_mode: str, threshold: float) -> tuple[Any, ...]:
@@ -568,16 +575,14 @@ def gas_kpi_card_html() -> str:
 
 
 def data_kpi_cards() -> list[tuple[str, str, str, str]]:
-    """Returns first 3 KPI cards (static). Gas Alerts card is built by gas_kpi_card_html()."""
+    """Returns first 2 KPI cards (static). Gas Alerts card is built by gas_kpi_card_html()."""
     stats = api_client.detection_stats()
     latest = api_client.detections(limit=1)
-    events = api_client.events(limit=50)
 
-    if any(value is None for value in (stats, latest, events)):
+    if any(value is None for value in (stats, latest)):
         return [
             ("Total Detections", "Backend unavailable", "Data API", RED),
             ("Last Detection", "Backend unavailable", "Data API", RED),
-            ("System Events", "Backend unavailable", "Data API", RED),
         ]
 
     total = int(stats.get("total") or 0)
@@ -586,7 +591,6 @@ def data_kpi_cards() -> list[tuple[str, str, str, str]]:
         ("Total Detections", str(total) if total else "No data yet", "Saved records", ORANGE),
         ("Last Detection", _canonical_class(last["class_name"]) if last else "No data yet",
          str(last.get("detection_time", ""))[:19] if last else "No saved detection", PURPLE),
-        ("System Events", str(len(events)) if events else "No data yet", "Recent event log", BLUE),
     ]
 
 
@@ -1128,6 +1132,35 @@ def wire_statistics_page(statistics: Any) -> None:
     )
 
 
+def restart_frontend() -> str:
+    import os
+    import threading
+    threading.Timer(2.0, lambda: os._exit(0)).start()
+    return (
+        "<div style='background:#1e3a5f;border:1px solid #3b82f6;border-radius:8px;"
+        "padding:10px 14px;color:#93c5fd;font-size:12px;'>"
+        "Frontend restarting in ~2 seconds. Refresh the page in about 10 seconds."
+        "</div>"
+    )
+
+
+def reboot_pi() -> str:
+    result = api_client.reboot_pi()
+    if result is None:
+        return (
+            "<div style='background:#7c2d12;border:1px solid #ea580c;border-radius:8px;"
+            "padding:10px 14px;color:#fca5a5;font-size:12px;'>"
+            "Failed to reach the station backend. Is it running?"
+            "</div>"
+        )
+    return (
+        "<div style='background:#1e3a5f;border:1px solid #3b82f6;border-radius:8px;"
+        "padding:10px 14px;color:#93c5fd;font-size:12px;'>"
+        "Raspberry Pi is rebooting. All services will be unavailable for ~60 seconds."
+        "</div>"
+    )
+
+
 def wire_debugging_page(debugging: Any) -> None:
     for test_id, button in debugging.test_buttons.items():
         button.click(
@@ -1153,17 +1186,69 @@ def wire_debugging_page(debugging: Any) -> None:
         outputs=[debugging.test_state, *interleaved, debugging.summary_output, debugging.progress_output],
         show_progress="hidden",
     )
+    debugging.restart_frontend_btn.click(
+        fn=restart_frontend,
+        inputs=None,
+        outputs=[debugging.system_control_status],
+        show_progress="hidden",
+    )
+    debugging.reboot_pi_btn.click(
+        fn=reboot_pi,
+        inputs=None,
+        outputs=[debugging.system_control_status],
+        show_progress="hidden",
+    )
 
 
 def wire_callbacks(layout: Any) -> None:
+    def _load_page_content(nav: str, stat_source: str, chart_type: str) -> tuple[Any, ...]:
+        no = gr.update()
+        if nav == "Data":
+            return (
+                detection_events_html("All classes"), gas_alerts_html(), gas_kpi_card_html(),
+                no, no, no, no, no, no,
+            )
+        if nav == "Statistics":
+            return (
+                no, no, no,
+                build_statistics_figure(stat_source, chart_type), no,
+                overview_figure("detections"), overview_figure("gas"),
+                overview_figure("classes"), overview_figure("temperature"),
+            )
+        if nav == "Debugging":
+            return no, no, no, no, diagnostic_summary_html(None), no, no, no, no
+        return no, no, no, no, no, no, no, no, no
+
     layout.nav.change(
         fn=page_updates,
         inputs=[layout.nav],
         outputs=[layout.header_icon, layout.header_title, layout.header_subtitle, *layout.page_columns],
         show_progress="hidden",
+    ).then(
+        fn=_load_page_content,
+        inputs=[layout.nav, layout.statistics.source, layout.statistics.chart_type],
+        outputs=[
+            layout.data_logs.detection_table,
+            layout.data_logs.gas_table,
+            layout.data_logs.gas_kpi,
+            layout.statistics.main_plot,
+            layout.debugging.summary_output,
+            layout.statistics.overview_detections,
+            layout.statistics.overview_gas,
+            layout.statistics.overview_classes,
+            layout.statistics.overview_temperature,
+        ],
+        show_progress="hidden",
+        concurrency_limit=None,
     )
     layout.timer.tick(fn=current_clock, inputs=None, outputs=[layout.clock], show_progress="hidden")
     layout.timer.tick(fn=gas_banner_html, inputs=None, outputs=[layout.gas_banner], show_progress="hidden")
+    layout.camera_timer.tick(
+        fn=live_camera_frame,
+        inputs=[layout.nav, layout.operating.cam_state],
+        outputs=[layout.operating.camera_output],
+        show_progress="hidden",
+    )
     layout.timer.tick(
         fn=live_operating,
         inputs=[
@@ -1230,4 +1315,5 @@ def wire_callbacks(layout: Any) -> None:
         outputs=[layout.data_logs.class_dist_plot],
         show_progress="hidden",
     )
+
 

@@ -73,6 +73,10 @@ class DetectionService:
         self._started_at = time.time()
         self._thread = threading.Thread(target=self._loop, name="detection", daemon=True)
         self._thread.start()
+        if self._gas_stop.is_set():
+            self._gas_stop = threading.Event()
+            self._gas_thread = threading.Thread(target=self._gas_loop, name="gas-poll", daemon=True)
+            self._gas_thread.start()
         self._sink.record_event("detection_started", "INFO", f"mode={self.mode}")
         log.info("Detection started (mode=%s)", self.mode)
         return True
@@ -104,7 +108,7 @@ class DetectionService:
         frame_no = 0
         while self._running.is_set():
             loop_start = time.time()
-            frame = self._cameras.read_active()
+            frame = self._cameras.read_inference()
             if frame is None:
                 time.sleep(0.1)
                 continue

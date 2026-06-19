@@ -7,7 +7,7 @@ import gradio as gr
 try:
     from ui.dashboard import build_dashboard
     from ui.constants import ASSET_DIR, CUSTOM_CSS
-except ModuleNotFoundError:  # pragma: no cover - keeps the entrypoint flexible in different launch modes
+except ModuleNotFoundError:
     from frontend.ui.dashboard import build_dashboard
     from frontend.ui.constants import ASSET_DIR, CUSTOM_CSS
 

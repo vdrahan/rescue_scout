@@ -31,12 +31,12 @@ class DataLogsPage:
 def build_data_logs_page() -> DataLogsPage:
     cards = data_kpi_cards()
     with gr.Row(elem_classes=["kpi-row"]):
-        # First 3 cards are static (don't change second-to-second)
+        # First 2 cards are static (don't change second-to-second)
         for label, value, note, color in cards:
-            with gr.Column(elem_classes=["metric-card"], min_width=150):
+            with gr.Column(elem_classes=["metric-card"], scale=1, min_width=200):
                 gr.Markdown(metric_html(label, value, note, color), elem_classes=["compact-md"])
         # Gas Alerts card is a tracked gr.HTML so the timer can update it
-        with gr.Column(elem_classes=["metric-card"], min_width=150):
+        with gr.Column(elem_classes=["metric-card"], scale=1, min_width=200):
             gas_kpi = gr.HTML(value=gas_kpi_card_html(), elem_classes=["compact-md"])
 
     with gr.Row(elem_classes=["data-chart-row"]):
@@ -51,7 +51,7 @@ def build_data_logs_page() -> DataLogsPage:
         with gr.Row(elem_classes=["logs-header"]):
             gr.HTML(
                 "<div class='logs-title'><span class='logs-title-main'>Stored Logs</span>"
-                "<span class='logs-title-sub'>Detection, system, and gas alert history</span></div>"
+                "<span class='logs-title-sub'>Detection and gas alert history</span></div>"
             )
             with gr.Column(scale=0, min_width=140, elem_classes=["logs-export-col"]):
                 export_button = gr.Button("Export CSV", variant="primary", size="md")

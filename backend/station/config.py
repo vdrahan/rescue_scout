@@ -41,9 +41,9 @@ class Settings(BaseSettings):
     model_path: str = "model/best.pt"  # trained YOLOv26 weights
     conf_threshold: float = 0.45
     iou_threshold: float = 0.45
-    target_fps: float = 8.0
-    img_size: int = 320
-    frame_skip: int = 0  # extra frames to drop between inferences (0 = none)
+    target_fps: float = 4.0
+    img_size: int = 224
+    frame_skip: int = 1  # extra frames to drop between inferences (0 = none)
     max_detections: int = 20
 
     # --- Cameras ---

@@ -35,9 +35,11 @@ def frame(camera_id: str, services: AppServices = Depends(get_services)) -> Resp
     if not cams.has(camera_id):
         raise HTTPException(status_code=404, detail=f"Unknown camera: {camera_id}")
 
-    if camera_id == cams.active_id:
-        data = services.detection.frame_jpeg()  # annotated when detection is on
+    if camera_id == cams.inference_source_id() and services.detection.active:
+        # Detection camera with AI on → annotated frame from inference
+        data = services.detection.frame_jpeg()
     else:
+        # FPV or detection with AI off → raw cached frame
         preview = cams.read_one(camera_id)
         data = to_jpeg(preview) if preview is not None else to_jpeg(
             placeholder(services.settings.frame_width, services.settings.frame_height, "no signal")

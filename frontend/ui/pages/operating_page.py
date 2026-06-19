@@ -54,6 +54,7 @@ def build_operating_page() -> OperatingPage:
         interactive=False,
         elem_classes=["camera-image", "camera-fullwidth"],
     )
+
     camera_status = gr.HTML(
         "<div class='op-camera-status op-camera-status-error'>Station unavailable</div>",
         elem_classes=["op-camera-status-wrap"],

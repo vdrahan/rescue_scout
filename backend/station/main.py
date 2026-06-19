@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import __version__
-from .api import cameras, detection, hardware, health, status
+from .api import cameras, detection, hardware, health, status, system
 from .api.deps import AppServices
 from .cameras.manager import CameraManager
 from .cameras.reader import CameraReader
@@ -82,7 +82,7 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    for module in (health, status, detection, cameras, hardware):
+    for module in (health, status, detection, cameras, hardware, system):
         app.include_router(module.router)
     return app
 

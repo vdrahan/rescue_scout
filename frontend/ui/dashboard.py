@@ -31,6 +31,7 @@ class DashboardLayout:
     lcd_status: gr.Textbox
     clock: gr.Markdown
     timer: gr.Timer
+    camera_timer: gr.Timer
     gas_banner: gr.HTML
     page_columns: list[gr.Column]
     operating: OperatingPage
@@ -98,6 +99,9 @@ def _build_shell() -> DashboardLayout:
                 page_columns.append(debugging_column)
 
     timer = gr.Timer(value=1.0, active=True)
+    # 10 fps camera polling — backend captures at 15 fps, so this keeps the FPV
+    # feed close to real-time without overloading the Gradio image round-trip.
+    camera_timer = gr.Timer(value=0.1, active=True)
 
     return DashboardLayout(
         nav=nav,
@@ -108,6 +112,7 @@ def _build_shell() -> DashboardLayout:
         lcd_status=lcd_status,
         clock=clock,
         timer=timer,
+        camera_timer=camera_timer,
         gas_banner=gas_banner,
         page_columns=page_columns,
         operating=operating,
@@ -128,6 +133,24 @@ _RUNTIME_CSS_FIX = """() => {
         '.op-threshold.block, .op-threshold.block.padded { background: transparent !important; border: 0 !important; box-shadow: none !important; padding: 0 !important; }',
     ].join('');
     document.head.appendChild(s);
+}"""
+
+# When a .page-pane column transitions from display:none to visible, Plotly charts
+# inside it have 0-dimension initialisation and render blank. Dispatching a resize
+# event tells Plotly to recalculate dimensions and re-render correctly.
+_PLOTLY_RESIZE_FIX = """() => {
+    const fireResize = () => setTimeout(() => window.dispatchEvent(new Event('resize')), 200);
+    const attach = () => {
+        const panes = document.querySelectorAll('.page-pane');
+        if (!panes.length) { setTimeout(attach, 400); return; }
+        const obs = new MutationObserver(muts => {
+            for (const m of muts) {
+                if (m.target.style.display !== 'none') { fireResize(); return; }
+            }
+        });
+        panes.forEach(p => obs.observe(p, { attributes: true, attributeFilter: ['style'] }));
+    };
+    attach();
 }"""
 
 
@@ -155,4 +178,5 @@ def build_dashboard() -> gr.Blocks:
             show_progress="hidden",
         )
         demo.load(js=_RUNTIME_CSS_FIX)
+        demo.load(js=_PLOTLY_RESIZE_FIX)
     return demo

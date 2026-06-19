@@ -206,21 +206,14 @@ From the ADC, the connections should be made as follows:
 
 ## MVP3 (Date: 09/06/2026)
 
-Lecturer: Stijn Walcarius , Geert DESLOOVERE, Thomas Huyghebaert
+Lecturers: Geert DESLOOVERE, Thomas Huyghebaert, Stijn Walcarius
 
-* ** Techconnect Template **
+* **Techconnect template**
+    
+    The Techconnect template is filled out wrong, the  
 
-    The 
 
 
 ## Conversation 7 (Date: 04/06/2026)
 
-Lecturer: MArie DEWITTE
-
-Questions for this conversation:
-
-- Question 1: How to connect the MQ-2 gas sensor to the Raspberry Pi?
-
-This is the feedback on my questions.
-
-- Feedback 1: To connect the MQ-2 sensor to the Raspberry Pi, an ADC converter is required because the Raspberry Pi cannot read analog signals directly.
+Lecturer: Mаrie DEWITTE

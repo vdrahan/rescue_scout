@@ -56,7 +56,7 @@ PAGE_DETAILS = {
     "Data": {
         "icon": "DB",
         "title": "Data",
-        "subtitle": "Detection history, gas alerts, system events and statistics.",
+        "subtitle": "Detection history, gas alerts and statistics.",
     },
     "Statistics": {
         "icon": "CHT",
@@ -424,10 +424,35 @@ footer { display: none !important; }
 }
 
 /* 14. METRICS */
-.metric-label { color: var(--sar-text-muted); font-size: 12px; font-weight: 700; }
-.metric-value { margin: 3px 0; color: var(--sar-orange); font-size: 24px; font-weight: 800; line-height: 1; }
-.metric-note { color: var(--sar-text-muted); font-size: 12px; }
+.metric-label { color: var(--sar-text-muted); font-size: 13px; font-weight: 700; }
+.metric-value { margin: 3px 0; color: var(--sar-orange); font-size: 30px; font-weight: 800; line-height: 1; }
+.metric-note { color: var(--sar-text-muted); font-size: 13px; }
 .stat-number input, .stat-number textarea { font-weight: 800 !important; color: var(--sar-orange) !important; }
+
+/* KPI row — equal width AND equal height for all three cards */
+.kpi-row { flex-wrap: nowrap !important; align-items: stretch !important; }
+.kpi-row > .form { display: flex !important; flex: 1 1 0 !important; min-width: 0 !important; align-items: stretch !important; }
+.kpi-row .metric-card {
+  flex: 1 1 0 !important;
+  min-width: 0 !important;
+  width: 100% !important;
+  height: auto !important;
+  min-height: 90px !important;
+  align-self: stretch !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+}
+.kpi-row .metric-card > .form { width: 100% !important; height: 100% !important; }
+.kpi-row .metric-card .block,
+.kpi-row .metric-card .wrap,
+.kpi-row .metric-card .compact-md {
+  width: 100% !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
 
 /* 15. BADGES */
 .badge-row { display: flex; flex-wrap: wrap; gap: 5px; }
@@ -1521,5 +1546,99 @@ button.primary, .primary button {
   box-shadow: none !important;
   padding: 0 !important;
   margin: 0 !important;
+}
+
+/* System Controls — strip Gradio grey from wrappers only (not buttons themselves) */
+#sys-ctrl-cards, #sys-ctrl-cards.block, #sys-ctrl-cards > .wrap,
+#sys-ctrl-btns, #sys-ctrl-btns.block, #sys-ctrl-btns > .form,
+#sys-ctrl-btns > .form > .block,
+#btn-restart-frontend.block, #btn-reboot-pi.block,
+#sys-ctrl-status, #sys-ctrl-status.block, #sys-ctrl-status > .wrap {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  --block-background-fill: transparent;
+  --block-border-color: transparent;
+  --block-border-width: 0px;
+}
+#sys-ctrl-btns { gap: 12px !important; margin-top: 4px !important; }
+#sys-ctrl-status { min-height: 0 !important; }
+
+/* Buttons — explicit orange colour so nothing can override */
+#btn-restart-frontend button,
+#btn-reboot-pi button {
+  background: var(--sar-orange) !important;
+  background-color: var(--sar-orange) !important;
+  border-color: var(--sar-orange-dark) !important;
+  color: #ffffff !important;
+  border-radius: 8px !important;
+  font-weight: 700 !important;
+}
+#btn-restart-frontend button:hover,
+#btn-reboot-pi button:hover {
+  background: var(--sar-orange-dark) !important;
+  background-color: var(--sar-orange-dark) !important;
+}
+
+/* System Controls card visuals */
+.sc-section { margin: 14px 0 0; }
+.sc-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.sc-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--sar-text);
+}
+.sc-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+.sc-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.sc-card {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  border-radius: 10px;
+  padding: 12px 14px;
+  border: 1px solid;
+}
+.sc-card-orange {
+  background: var(--sar-orange-soft);
+  border-color: var(--sar-orange-border);
+}
+.sc-card-red {
+  background: var(--sar-red-soft);
+  border-color: var(--sar-red-border);
+}
+.sc-icon { font-size: 20px; flex-shrink: 0; margin-top: 1px; }
+.sc-card-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--sar-text);
+  margin-bottom: 3px;
+}
+.sc-card-desc {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--sar-text-muted);
 }
 """

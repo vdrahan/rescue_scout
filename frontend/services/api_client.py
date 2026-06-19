@@ -175,6 +175,10 @@ def cycle_lcd_screen() -> dict | None:
     return _json("station", _station, "POST", "/api/hardware/lcd/cycle")
 
 
+def reboot_pi() -> dict | None:
+    return _json("station", _station, "POST", "/api/system/reboot")
+
+
 # ---------------------------------------------------------------------------
 # Data API (history / statistics)
 # ---------------------------------------------------------------------------
