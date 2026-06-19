@@ -225,10 +225,32 @@ def badge_row(*labels: str) -> str:
 
 
 def threshold_head_html(value: float) -> str:
+    v = int(value)
+    pct = f"{v}%"
+    oninput = (
+        "this.style.setProperty('--p',this.value+'%');"
+        "var d=this.parentElement.querySelector('.thr-val');"
+        "if(d)d.textContent=this.value+'%'"
+    )
+    onchange = (
+        "(function(v){"
+        "var n=document.querySelector('#thr-value input[type=number]');"
+        "if(n){n.value=v;"
+        "n.dispatchEvent(new Event('input',{bubbles:true}));"
+        "n.dispatchEvent(new Event('change',{bubbles:true}))}"
+        "})(this.value)"
+    )
     return (
-        "<div class='op-threshold-head'>"
-        "<span class='op-control-label'>Confidence Threshold</span>"
-        f"<span class='op-threshold-value'>{int(value)}%</span>"
+        "<div class='thr-card'>"
+        "<div class='thr-head'>"
+        f"<span class='thr-label'>Confidence Threshold</span>"
+        f"<span class='thr-val'>{pct}</span>"
+        "</div>"
+        f"<input type='range' class='thr-range' min='0' max='100' step='5' value='{v}'"
+        f" style='--p:{pct}'"
+        f" oninput=\"{oninput}\""
+        f" onchange=\"{onchange}\""
+        " />"
         "</div>"
     )
 
@@ -343,7 +365,7 @@ def operating_update(ai_enabled: bool, camera_mode: str, threshold: float) -> tu
     if latest is None and status is None:
         return (
             None,
-            camera_status_html("Station unavailable", "error"),
+            camera_status_html("📡 Station Offline — Check Connection", "error"),
             0, 0, "Station unavailable",
             recent_detections_html([], "Station unavailable"),
         )
@@ -353,12 +375,12 @@ def operating_update(ai_enabled: bool, camera_mode: str, threshold: float) -> tu
 
     if camera_info.get("status") == "error":
         detail = html.escape(str(camera_info.get("last_error") or "camera signal unavailable"))
-        cam_status = camera_status_html(f"Camera unavailable - {detail}", "error")
+        cam_status = camera_status_html(f"📷 Camera Offline — {detail}", "error")
     elif frame is None:
-        cam_status = camera_status_html("No frame available", "warning")
+        cam_status = camera_status_html("⏳ No Frame Available — Waiting for signal...", "warning")
     else:
         active_camera = (status or {}).get("cameras", {}).get("active", cam_id)
-        cam_status = camera_status_html(f"Camera live - {_camera_name(active_camera)}", "ok")
+        cam_status = camera_status_html(f"✅ Camera Live — {_camera_name(active_camera)}", "ok")
 
     recent = _latest_recent_rows(latest or {})
     detection_count = len((latest or {}).get("detections") or [])
@@ -594,15 +616,28 @@ def data_kpi_cards() -> list[tuple[str, str, str, str]]:
     ]
 
 
-def export_log_message():
-    # Show a temporary notice banner, then auto-hide after ~10s.
-    notice = (
-        "<div class='export-banner'>CSV export is not connected yet. "
-        "The tables above show live data-api records.</div>"
+def export_detections_csv(class_filter: str):
+    import csv, tempfile
+    from .constants import DETECTION_HEADERS
+    rows = filter_detection_events(class_filter)
+    tmp = tempfile.NamedTemporaryFile(
+        mode="w", suffix=".csv", delete=False, newline="", prefix="detection_events_"
     )
-    yield gr.update(value=notice, visible=True)
-    time.sleep(10)
-    yield gr.update(value="", visible=False)
+    csv.writer(tmp).writerows([DETECTION_HEADERS] + rows)
+    tmp.close()
+    return gr.update(value=tmp.name, visible=True)
+
+
+def export_gas_csv():
+    import csv, tempfile
+    from .constants import GAS_ALERT_HEADERS
+    rows = gas_alert_rows()
+    tmp = tempfile.NamedTemporaryFile(
+        mode="w", suffix=".csv", delete=False, newline="", prefix="gas_alerts_"
+    )
+    csv.writer(tmp).writerows([GAS_ALERT_HEADERS] + rows)
+    tmp.close()
+    return gr.update(value=tmp.name, visible=True)
 
 
 def _base_figure(title: str) -> go.Figure:
@@ -1132,7 +1167,8 @@ def wire_operating_page(operating: Any, nav: gr.Radio) -> None:
 
 def wire_data_logs_page(data_logs: Any) -> None:
     data_logs.class_filter.change(fn=detection_events_html, inputs=[data_logs.class_filter], outputs=[data_logs.detection_table], show_progress="hidden")
-    data_logs.export_button.click(fn=export_log_message, inputs=None, outputs=[data_logs.export_banner], show_progress="hidden")
+    data_logs.detection_export_button.click(fn=export_detections_csv, inputs=[data_logs.class_filter], outputs=[data_logs.detection_export_file], show_progress="hidden")
+    data_logs.gas_export_button.click(fn=export_gas_csv, inputs=None, outputs=[data_logs.gas_export_file], show_progress="hidden")
     # Refresh gas table and gas KPI when class filter changes (user is actively on the page)
     data_logs.class_filter.change(fn=gas_alerts_html, inputs=None, outputs=[data_logs.gas_table], show_progress="hidden")
     data_logs.class_filter.change(fn=gas_kpi_card_html, inputs=None, outputs=[data_logs.gas_kpi], show_progress="hidden")

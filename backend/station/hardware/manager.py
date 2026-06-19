@@ -292,6 +292,36 @@ class HardwareManager:
         stop.wait(duration)
         module.set_channel(None)
 
+    def startup_melody(self) -> None:
+        """Triumphant startup fanfare played once when the station is ready.
+
+        Three-phase structure (~1.6 s total):
+          CALL    da — DA          short tap → accented hit
+          BUILD   da · da · dA     rapid triplet rushing into an accent
+          FINALE  DA ——— DAAAA     medium note → dramatic pause → long hold
+
+        Active buzzers can't change pitch; rhythm alone shapes the character.
+        Short notes feel sharp/high, long notes feel deep/resolved.
+        Skipped silently when no buzzer is present.
+        """
+        buzzer = self._devices.get("buzzer")
+        if not isinstance(buzzer, Buzzer):
+            return
+
+        # --- CALL: quick tap + accented hit (grabs attention) ---
+        buzzer.beep(times=1, on=0.06, off=0.05)   # da  (sharp tap)
+        buzzer.beep(times=1, on=0.13, off=0.07)   # DA  (strong accent)
+
+        # --- BUILD: three fast notes rushing to a heavier beat ---
+        buzzer.beep(times=1, on=0.06, off=0.04)   # da
+        buzzer.beep(times=1, on=0.06, off=0.04)   # da
+        buzzer.beep(times=1, on=0.11, off=0.10)   # dA  (longer rest = breath)
+
+        # --- FINALE: medium note → micro-pause → triumphant long hold ---
+        buzzer.beep(times=1, on=0.16, off=0.06)   # DA
+        time.sleep(0.06)                            # dramatic silence
+        buzzer.beep(times=1, on=0.50, off=0.0)    # DAAAA
+
     def show_startup_lcd(self, hw_ok: bool, video_ok: bool, error: str = "") -> None:
         lcd = self._devices.get("lcd")
         if not isinstance(lcd, Lcd):

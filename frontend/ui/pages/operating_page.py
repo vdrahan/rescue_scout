@@ -14,7 +14,7 @@ class OperatingPage:
     ai_btn: gr.Button
     cam_btn: gr.Button
     threshold_head: gr.HTML
-    threshold: gr.Slider
+    threshold: gr.Number
     camera_output: gr.Image
     camera_status: gr.HTML
     detection_count: gr.Number
@@ -37,14 +37,8 @@ def build_operating_page() -> OperatingPage:
             gr.HTML("<span class='op-control-label'>Camera Feed</span>")
             cam_btn = gr.Button("Camera: Detection Camera", size="sm", elem_classes=["op-toggle-btn", "op-cam-btn"])
         with gr.Column(min_width=0, elem_classes=["control-card", "op-control-cell", "op-threshold-cell"]):
-            threshold_head = gr.HTML(threshold_head_html(45))
-            threshold = gr.Slider(
-                0, 100, value=45, step=5,
-                label="Confidence threshold",
-                show_label=False,
-                elem_id="op-threshold-slider",
-                elem_classes=["op-threshold"],
-            )
+            threshold_head = gr.HTML(threshold_head_html(60))
+            threshold = gr.Number(value=60, visible=False, precision=0, elem_id="thr-value")
 
     camera_output = gr.Image(
         value=None,
@@ -56,7 +50,7 @@ def build_operating_page() -> OperatingPage:
     )
 
     camera_status = gr.HTML(
-        "<div class='op-camera-status op-camera-status-error'>Station unavailable</div>",
+        "<div class='op-camera-status op-camera-status-error'>📡 Station Offline — Check Connection</div>",
         elem_classes=["op-camera-status-wrap"],
     )
 

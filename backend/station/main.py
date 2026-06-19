@@ -62,6 +62,7 @@ async def lifespan(app: FastAPI):
         video_ok=not camera_mgr.degraded,
         error="; ".join(error_parts),
     )
+    hardware_mgr.startup_melody()
     try:
         yield
     finally:

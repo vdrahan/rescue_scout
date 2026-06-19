@@ -474,11 +474,48 @@ footer { display: none !important; }
   border-radius: 10px !important;
   border: 2px solid var(--sar-orange) !important;
   object-fit: cover !important;
+  position: relative !important;
+  z-index: 3 !important;
 }
 .camera-image .image-container {
   border: 2px solid var(--sar-orange) !important;
-  background: #111827 !important;
+  background: #374151 !important;
   border-radius: 10px !important;
+  position: relative !important;
+  overflow: hidden !important;
+}
+/* Hide Gradio's default no-image placeholder/SVG icon */
+.camera-image .image-container > *:not(img) {
+  display: none !important;
+}
+/* No-signal overlay: emoji + title (::before), subtitle (::after) */
+.camera-image .image-container::before {
+  content: "📷  Camera Offline";
+  position: absolute !important;
+  top: calc(50% - 20px) !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  color: var(--sar-orange) !important;
+  font-size: 24px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.04em !important;
+  pointer-events: none !important;
+  z-index: 1 !important;
+  white-space: nowrap !important;
+}
+.camera-image .image-container::after {
+  content: "Check your connection";
+  position: absolute !important;
+  top: calc(50% + 22px) !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  color: #9ca3af !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.02em !important;
+  pointer-events: none !important;
+  z-index: 1 !important;
+  white-space: nowrap !important;
 }
 
 /* 17. TABLES */
@@ -525,51 +562,79 @@ footer { display: none !important; }
   border-radius: 8px !important;
 }
 
-/* Confidence Threshold card — label + live value over a compact slider */
-.op-threshold-head {
-  display: flex !important;
-  align-items: baseline !important;
-  justify-content: space-between !important;
-  gap: 8px !important;
-}
-.op-threshold-value {
-  font-size: 16px !important;
-  font-weight: 800 !important;
-  color: var(--sar-orange) !important;
-  line-height: 1 !important;
-}
-/* Hide Gradio's built-in slider head (label + number box + reset);
-   the card's own head already shows "Confidence Threshold" and the live value.
-   The range input keeps its aria-label, so it stays screen-reader accessible. */
-.op-threshold .head { display: none !important; }
-
-/* Slider gray — exact class from Gradio Svelte template: slider_input_container.svelte-8epfm4 */
-#op-threshold-slider .slider_input_container,
-.op-threshold .slider_input_container {
+/* Confidence Threshold — custom range input, zero Gradio chrome */
+.op-threshold-cell .block,
+.op-threshold-cell .wrap,
+.op-threshold-cell .prose {
   background: transparent !important;
-  background-color: transparent !important;
-  border: 0 !important;
-  box-shadow: none !important;
-}
-/* Also strip .wrap and .tab-like-container backgrounds */
-#op-threshold-slider .wrap,
-#op-threshold-slider .tab-like-container,
-.op-threshold .wrap,
-.op-threshold .tab-like-container {
-  background: transparent !important;
-  background-color: transparent !important;
-  border: 0 !important;
-  box-shadow: none !important;
-}
-/* Strip the block-level padded wrapper */
-#op-threshold-slider,
-#op-threshold-slider.block,
-#op-threshold-slider.block.padded {
-  background: transparent !important;
-  background-color: transparent !important;
   border: 0 !important;
   box-shadow: none !important;
   padding: 0 !important;
+  margin: 0 !important;
+}
+.thr-card { width: 100%; }
+.thr-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 10px;
+}
+.thr-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--sar-text);
+}
+.thr-val {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--sar-orange);
+  line-height: 1;
+}
+.thr-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 4px;
+  background: linear-gradient(
+    to right,
+    var(--sar-orange) var(--p, 45%),
+    rgba(148,163,184,0.25) var(--p, 45%)
+  );
+  outline: none;
+  cursor: pointer;
+  display: block;
+}
+.thr-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  background: #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2.5px var(--sar-orange), 0 2px 6px rgba(0,0,0,0.2);
+  cursor: grab;
+  transition: box-shadow 0.15s;
+}
+.thr-range::-webkit-slider-thumb:hover { box-shadow: 0 0 0 3.5px var(--sar-orange), 0 2px 8px rgba(0,0,0,0.3); }
+.thr-range::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  background: #ffffff;
+  border-radius: 50%;
+  border: none;
+  box-shadow: 0 0 0 2.5px var(--sar-orange), 0 2px 6px rgba(0,0,0,0.2);
+  cursor: grab;
+}
+.thr-range::-moz-range-progress {
+  height: 4px;
+  background: var(--sar-orange);
+  border-radius: 4px;
+}
+.thr-range::-moz-range-track {
+  height: 4px;
+  background: rgba(148,163,184,0.25);
+  border-radius: 4px;
 }
 
 /* AI Detection — ON state: .op-ai-btn is on wrapper div, button.primary is the inner element */
@@ -620,12 +685,12 @@ button.op-cam-btn:hover { background: var(--sar-surface-soft) !important; border
 }
 .op-camera-status {
   margin-top: 6px;
-  min-height: 34px;
+  min-height: 40px;
   display: flex;
   align-items: center;
   border-radius: 8px;
-  padding: 6px 10px;
-  font-size: 13px;
+  padding: 8px 14px;
+  font-size: 15px;
   font-weight: 700;
   border: 1px solid var(--sar-border);
   background: var(--sar-surface-soft);
