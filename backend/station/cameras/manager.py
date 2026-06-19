@@ -7,6 +7,7 @@ import threading
 import numpy as np
 
 from ..config import Settings
+from ..imaging import to_jpeg
 from ..logging_conf import get_logger
 from .base import CameraSource
 from .mock_camera import MockCamera
@@ -19,11 +20,14 @@ class CameraManager:
         self._settings = settings
         self._lock = threading.Lock()
         self._caches: dict[str, np.ndarray | None] = {}
+        self._seq: dict[str, int] = {}            # bumped on every fresh frame
+        self._jpeg_cache: dict[str, tuple] = {}   # cam_id -> (key, jpeg bytes)
         self.degraded = False
         self._cameras = self._build()
         self._active_id = next(iter(self._cameras))
         for cam_id in self._cameras:
             self._caches[cam_id] = None
+            self._seq[cam_id] = 0
 
     # -- construction -------------------------------------------------------
     def _build(self) -> dict[str, CameraSource]:
@@ -123,6 +127,7 @@ class CameraManager:
         with self._lock:
             if frame is not None:
                 self._caches[cam_id] = frame
+                self._seq[cam_id] += 1
             # On error we intentionally keep the last good frame so the UI
             # shows a stale image while the camera reconnects rather than
             # flashing a placeholder "no signal" screen.
@@ -136,6 +141,25 @@ class CameraManager:
         """Return the last cached frame for a camera — never blocks."""
         with self._lock:
             return self._caches.get(cam_id)
+
+    def read_one_jpeg(self, cam_id: str, max_width: int | None = None,
+                      quality: int = 80) -> bytes | None:
+        """Encoded JPEG for the cached frame, memoised per frame so repeated polls
+        (the FPV feed refreshes faster than the camera produces frames) never
+        re-encode the same image — that redundant work was starving the reader."""
+        with self._lock:
+            frame = self._caches.get(cam_id)
+            seq = self._seq.get(cam_id, 0)
+            cached = self._jpeg_cache.get(cam_id)
+        if frame is None:
+            return None
+        key = (seq, max_width, quality)
+        if cached is not None and cached[0] == key:
+            return cached[1]
+        data = to_jpeg(frame, quality=quality, max_width=max_width)
+        with self._lock:
+            self._jpeg_cache[cam_id] = (key, data)
+        return data
 
     def cached(self) -> np.ndarray | None:
         with self._lock:

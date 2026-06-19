@@ -39,9 +39,14 @@ def frame(camera_id: str, services: AppServices = Depends(get_services)) -> Resp
         # Detection camera with AI on → annotated frame from inference
         data = services.detection.frame_jpeg()
     else:
-        # FPV or detection with AI off → raw cached frame
-        preview = cams.read_one(camera_id)
-        data = to_jpeg(preview) if preview is not None else to_jpeg(
-            placeholder(services.settings.frame_width, services.settings.frame_height, "no signal")
+        # FPV or detection with AI off → cached frame, aggressively downscaled and
+        # low-quality for a minimum-latency live feed (encoded once per frame).
+        s = services.settings
+        data = cams.read_one_jpeg(
+            camera_id,
+            max_width=s.camera_stream_max_width or None,
+            quality=s.camera_stream_quality,
         )
+        if data is None:
+            data = to_jpeg(placeholder(s.frame_width, s.frame_height, "no signal"))
     return Response(content=data, media_type="image/jpeg")

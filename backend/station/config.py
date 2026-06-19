@@ -52,7 +52,13 @@ class Settings(BaseSettings):
     usb_camera_index: int = 0
     frame_width: int = 640
     frame_height: int = 480
-    camera_read_fps: float = 15.0  # how fast the CameraReader background thread captures
+    camera_read_fps: float = 30.0  # upper bound for the CameraReader capture loop (self-paces to the camera's FPS)
+    # Live preview feed (FPV / non-AI) is tuned for MINIMUM latency, not quality:
+    # decimate to this width and encode at this JPEG quality before sending. Small
+    # frames encode in a few ms and transfer/render almost instantly. Set width 0
+    # for native resolution; lower both for even less latency.
+    camera_stream_max_width: int = 640
+    camera_stream_quality: int = 50
 
     # --- Hardware pins (BCM) — defaults from tests/test.py wiring ---
     gpio_chip: int = 0

@@ -99,9 +99,10 @@ def _build_shell() -> DashboardLayout:
                 page_columns.append(debugging_column)
 
     timer = gr.Timer(value=1.0, active=True)
-    # 10 fps camera polling — backend captures at 15 fps, so this keeps the FPV
-    # feed close to real-time without overloading the Gradio image round-trip.
-    camera_timer = gr.Timer(value=0.1, active=True)
+    # 30 fps camera polling for a minimum-latency FPV feed. The backend serves tiny
+    # downscaled JPEGs cached per frame, so polling above the camera's FPS is cheap
+    # (cache hits) and just minimises how long a fresh frame waits for the next tick.
+    camera_timer = gr.Timer(value=0.033, active=True)
 
     return DashboardLayout(
         nav=nav,

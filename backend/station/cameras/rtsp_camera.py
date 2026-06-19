@@ -29,6 +29,12 @@ os.environ.setdefault("OPENCV_FFMPEG_CAPTURE_OPTIONS", RTSP_FFMPEG_OPTIONS)
 
 _RECONNECT_DELAY = 1.0  # seconds between reconnect attempts after failure
 
+# Frames to grab before retrieving. The background CameraReader drains the active
+# camera every tick, so 1 grab returns the freshest frame with the lowest latency.
+# Higher values block waiting for N frames at the camera's FPS (e.g. 10 grabs on a
+# 15 fps stream stalls each read ~0.6 s), which throttled the FPV feed badly.
+_GRAB_FLUSH = 1
+
 
 class _CvCamera(CameraSource):
     def __init__(self, cam_id: str, name: str, kind: str, source):
@@ -69,7 +75,7 @@ class _CvCamera(CameraSource):
             if self._cap is None:
                 return None
         try:
-            for _ in range(10):  # flush stale frames for low latency, as in model.py
+            for _ in range(_GRAB_FLUSH):
                 self._cap.grab()
             ok, frame = self._cap.retrieve()
             if not ok:
