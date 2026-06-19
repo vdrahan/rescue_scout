@@ -72,7 +72,7 @@ class Settings(BaseSettings):
     # I2C
     ads1115_i2c_addr: int = 0x4b
     mq2_channel: int = 0
-    gas_danger_ppm: float = 20.0
+    gas_danger_ppm: float = 200.0
     lcd_i2c_addr: int = 0x27
     lcd_i2c_bus: int = 1
 

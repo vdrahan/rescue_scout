@@ -32,7 +32,7 @@ log = logging.getLogger(__name__)
 # a genuine gas drop pulls the averaged raw below the baseline.
 _CLEAN_AIR_RAW: int = 185
 # Full-scale output in ppm (when avg_raw = 0, i.e. sensor fully saturated with gas)
-_MAX_PPM: float = 200.0
+_MAX_PPM: float = 300.0
 # Number of consecutive reads to average — reduces single-read noise (±13 raw counts)
 _SAMPLES: int = 5
 # Delay between samples in seconds

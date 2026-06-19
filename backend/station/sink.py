@@ -59,9 +59,16 @@ class DataApiSink:
         })
 
     def record_gas(self, ppm: float, dangerous: bool, message: str = "") -> None:
+        if not message:
+            if ppm >= 250:
+                message = "Critical — do not enter"
+            elif ppm >= 200:
+                message = "Warning — use caution"
+            else:
+                message = "Normal — safe to proceed"
         self._enqueue("sensor", {
             "sensor_name": "gas", "value": round(ppm, 2),
-            "message": message or ("Gas level high" if dangerous else "Gas level normal"),
+            "message": message,
             "is_dangerous": dangerous,
         })
 

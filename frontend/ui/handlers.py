@@ -540,13 +540,19 @@ def _format_gas_row(r: dict) -> list[str]:
     dt = str(r.get("reading_time", ""))
     _, _, time_part = dt.replace(" ", "T").partition("T")
     value = r.get("value")
-    reading = "unknown" if value is None else f"{float(value):.0f} ppm"
-    is_dangerous = bool(r.get("is_dangerous"))
+    ppm = float(value) if value is not None else 0.0
+    reading = "unknown" if value is None else f"{ppm:.0f} ppm"
+    if ppm >= 250:
+        level = "Critical"
+    elif ppm >= 200:
+        level = "Warning"
+    else:
+        level = "Normal"
     return [
         time_part[:8] or dt[:19],
         reading,
-        "Critical" if is_dangerous else "Normal",
-        str(r.get("message") or ("Do not enter" if is_dangerous else "Safe to proceed")),
+        level,
+        str(r.get("message") or ""),
     ]
 
 
@@ -685,7 +691,7 @@ def _series_for(data_source: str):
         if not result.available or not result.has_data:
             return [], [], "Gas ppm", YELLOW, 250, result.message
         return ([_fmt_bucket(r["bucket"]) for r in rows],
-                [float(r.get("avg_value") or 0) for r in rows], "Gas ppm", YELLOW, 250, "")
+                [float(r.get("max_value") or 0) for r in rows], "Gas ppm", YELLOW, 250, "")
 
     if data_source == "Temperature":
         rows = api_client.stat_sensor_over_time("temperature", "minute")
@@ -788,14 +794,16 @@ def _build_gas_history_figure() -> go.Figure:
         fig.update_layout(height=280, showlegend=False)
         return fig
     times = [_fmt_bucket(r["bucket"]) for r in rows]
-    values = [float(r.get("avg_value") or 0) for r in rows]
+    values = [float(r.get("max_value") or 0) for r in rows]
     fig = _base_figure("Gas Sensor History")
-    fig.add_bar(x=times, y=values, marker_color=YELLOW, name="Gas ppm")
+    fig.add_bar(x=times, y=values, marker_color=YELLOW, name="Peak ppm")
     if times:
+        fig.add_scatter(x=times, y=[200] * len(times), mode="lines",
+                        line={"color": "#f59e0b", "dash": "dot"}, name="Warning")
         fig.add_scatter(x=times, y=[250] * len(times), mode="lines",
                         line={"color": RED, "dash": "dot"}, name="Danger")
     fig.update_layout(height=280)
-    fig.update_yaxes(title_text="ppm", title_font={"size": 14}, tickfont={"size": 13})
+    fig.update_yaxes(title_text="ppm (peak)", title_font={"size": 14}, tickfont={"size": 13})
     return fig
 
 
@@ -931,7 +939,6 @@ def test_rows_html(test: dict, status: str, detail: str = "") -> str:
         rows += (
             f"<div style='display:flex;align-items:center;padding:4px 0;border-bottom:1px solid #f3f4f6'>"
             f"<span style='font-size:11px;color:#64748b;flex:1'>{label}</span>"
-            f"<span style='font-size:11px;color:#cbd5e1;margin-right:10px'>{expected}</span>"
             f"{actual}</div>"
         )
     if safe_detail and status in {"failed", "skipped"}:
@@ -972,26 +979,9 @@ def diagnostic_summary_html(state: dict[str, str] | None) -> str:
     all_not_tested = all(v == "not_tested" for v in state.values())
 
     if all_not_tested:
-        hw = api_client.hardware_status()
-        if hw is None:
-            pct, ok_count, fail_count = 0, 0, 0
-            status_label, ring_color = "Station unavailable", "#ef4444"
-            issues = [
-                {"name": "Station", "check": "Hardware API", "result": "Unavailable",
-                 "hint": "Start the station service and retry diagnostics"},
-            ]
-        else:
-            devices = hw.get("devices", [])
-            ok_count = sum(1 for d in devices if d.get("ok"))
-            fail_count = len(devices) - ok_count
-            pct = int(100 * ok_count / len(devices)) if devices else 0
-            status_label = "Hardware Ready" if fail_count == 0 else "Hardware Degraded"
-            ring_color = "#10b981" if fail_count == 0 else "#f05a24"
-            issues = [
-                {"name": d.get("name", d.get("id", "Device")), "check": "Status",
-                 "result": "Failed", "hint": "Run the individual component test"}
-                for d in devices if not d.get("ok")
-            ]
+        pct, ok_count, fail_count = 0, 0, 0
+        status_label, ring_color = "No Tests Run", "#94a3b8"
+        issues = []
     elif passed == total:
         pct, ok_count, fail_count = 100, total, 0
         status_label, ring_color = "System Healthy", "#10b981"
@@ -1018,14 +1008,21 @@ def diagnostic_summary_html(state: dict[str, str] | None) -> str:
         f'<text x="55" y="62" text-anchor="middle" font-size="20" font-weight="800"'
         f' fill="{ring_color}">{pct}%</text></svg>'
     )
-    ok_badge = (
-        f"<span style='background:#d1fae5;color:#065f46;border-radius:999px;"
-        f"font-size:11px;font-weight:600;padding:3px 10px'>{ok_count} params OK</span>"
-    )
-    fail_badge = (
-        f"<span style='background:#fee2e2;color:#991b1b;border-radius:999px;"
-        f"font-size:11px;font-weight:600;padding:3px 10px'>{fail_count} failed</span>"
-    )
+    if all_not_tested:
+        ok_badge = (
+            "<span style='background:#f1f5f9;color:#64748b;border-radius:999px;"
+            "font-size:11px;font-weight:600;padding:3px 10px'>Run tests to see results</span>"
+        )
+        fail_badge = ""
+    else:
+        ok_badge = (
+            f"<span style='background:#d1fae5;color:#065f46;border-radius:999px;"
+            f"font-size:11px;font-weight:600;padding:3px 10px'>{ok_count} passed</span>"
+        )
+        fail_badge = (
+            f"<span style='background:#fee2e2;color:#991b1b;border-radius:999px;"
+            f"font-size:11px;font-weight:600;padding:3px 10px'>{fail_count} failed</span>"
+        )
 
     issue_cards = ""
     for issue in issues:
