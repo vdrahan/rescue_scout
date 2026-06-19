@@ -374,8 +374,7 @@ def operating_update(ai_enabled: bool, camera_mode: str, threshold: float) -> tu
     frame = api_client.camera_frame(cam_id)
 
     if camera_info.get("status") == "error":
-        detail = html.escape(str(camera_info.get("last_error") or "camera signal unavailable"))
-        cam_status = camera_status_html(f"📷 Camera Offline — {detail}", "error")
+        cam_status = camera_status_html("🔄 Camera Reconnecting — Showing last frame", "warning")
     elif frame is None:
         cam_status = camera_status_html("⏳ No Frame Available — Waiting for signal...", "warning")
     else:

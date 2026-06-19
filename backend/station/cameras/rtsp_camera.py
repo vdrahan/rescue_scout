@@ -16,15 +16,18 @@ from .base import CameraSource
 
 log = get_logger(__name__)
 
-# stimeout must come first so the TCP socket is configured before any
-# connection is attempted.  flags;low_delay was removed — it causes
-# avformat_find_stream_info to fail on some TP-Link firmware versions.
+# stimeout: TCP socket connection timeout (µs).
+# rw_timeout: FFmpeg I/O read/write timeout (µs) — limits the OpenCV interrupt
+#   callback window from the default 30 s to 5 s so dropped streams are detected
+#   and reconnected much faster.
+# flags;low_delay was removed — it causes avformat_find_stream_info to fail on
+# some TP-Link firmware versions.
 RTSP_FFMPEG_OPTIONS = (
-    "rtsp_transport;tcp|stimeout;5000000|max_delay;0|fflags;nobuffer"
+    "rtsp_transport;tcp|stimeout;5000000|rw_timeout;5000000|max_delay;0|fflags;nobuffer"
 )
 os.environ.setdefault("OPENCV_FFMPEG_CAPTURE_OPTIONS", RTSP_FFMPEG_OPTIONS)
 
-_RECONNECT_DELAY = 5.0  # seconds between reconnect attempts after failure
+_RECONNECT_DELAY = 1.0  # seconds between reconnect attempts after failure
 
 
 class _CvCamera(CameraSource):

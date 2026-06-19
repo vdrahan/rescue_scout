@@ -123,8 +123,9 @@ class CameraManager:
         with self._lock:
             if frame is not None:
                 self._caches[cam_id] = frame
-            elif cam.status == "error":
-                self._caches[cam_id] = None
+            # On error we intentionally keep the last good frame so the UI
+            # shows a stale image while the camera reconnects rather than
+            # flashing a placeholder "no signal" screen.
         return frame
 
     def read_active(self) -> np.ndarray | None:

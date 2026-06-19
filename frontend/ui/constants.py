@@ -474,48 +474,11 @@ footer { display: none !important; }
   border-radius: 10px !important;
   border: 2px solid var(--sar-orange) !important;
   object-fit: cover !important;
-  position: relative !important;
-  z-index: 3 !important;
 }
 .camera-image .image-container {
   border: 2px solid var(--sar-orange) !important;
-  background: #374151 !important;
+  background: #111827 !important;
   border-radius: 10px !important;
-  position: relative !important;
-  overflow: hidden !important;
-}
-/* Hide Gradio's default no-image placeholder/SVG icon */
-.camera-image .image-container > *:not(img) {
-  display: none !important;
-}
-/* No-signal overlay: emoji + title (::before), subtitle (::after) */
-.camera-image .image-container::before {
-  content: "📷  Camera Offline";
-  position: absolute !important;
-  top: calc(50% - 20px) !important;
-  left: 50% !important;
-  transform: translate(-50%, -50%) !important;
-  color: var(--sar-orange) !important;
-  font-size: 24px !important;
-  font-weight: 800 !important;
-  letter-spacing: 0.04em !important;
-  pointer-events: none !important;
-  z-index: 1 !important;
-  white-space: nowrap !important;
-}
-.camera-image .image-container::after {
-  content: "Check your connection";
-  position: absolute !important;
-  top: calc(50% + 22px) !important;
-  left: 50% !important;
-  transform: translate(-50%, -50%) !important;
-  color: #9ca3af !important;
-  font-size: 14px !important;
-  font-weight: 500 !important;
-  letter-spacing: 0.02em !important;
-  pointer-events: none !important;
-  z-index: 1 !important;
-  white-space: nowrap !important;
 }
 
 /* 17. TABLES */
