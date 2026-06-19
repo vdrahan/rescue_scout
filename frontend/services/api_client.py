@@ -10,6 +10,7 @@ import io
 import logging
 import time
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from typing import Any
 
 import httpx
@@ -219,14 +220,17 @@ def events(limit: int = 50) -> list[dict] | None:
     return _json("api", _api, "GET", "/events", params={"limit": limit})
 
 
-def stat_detections_over_time(bucket: str = "minute") -> list[dict] | None:
-    return _json("api", _api, "GET", "/statistics/detections-over-time", params={"bucket": bucket})
+def stat_detections_over_time(bucket: str = "minute", hours: int = 2) -> list[dict] | None:
+    from_time = (datetime.now() - timedelta(hours=hours)).isoformat()
+    return _json("api", _api, "GET", "/statistics/detections-over-time",
+                 params={"bucket": bucket, "from_time": from_time})
 
 
 def stat_class_distribution() -> list[dict] | None:
     return _json("api", _api, "GET", "/statistics/class-distribution")
 
 
-def stat_sensor_over_time(sensor_name: str = "gas", bucket: str = "minute") -> list[dict] | None:
+def stat_sensor_over_time(sensor_name: str = "gas", bucket: str = "minute", hours: int = 2) -> list[dict] | None:
+    from_time = (datetime.now() - timedelta(hours=hours)).isoformat()
     return _json("api", _api, "GET", "/statistics/sensor-over-time",
-                 params={"sensor_name": sensor_name, "bucket": bucket})
+                 params={"sensor_name": sensor_name, "bucket": bucket, "from_time": from_time})

@@ -741,6 +741,9 @@ _dist_fig_cache: go.Figure | None = None
 _gas_fig_last_rebuild: float = 0.0
 _dist_fig_last_rebuild: float = 0.0
 
+_STATS_INTERVAL = 15.0
+_stats_fig_last_rebuild: float = 0.0
+
 
 def _build_gas_history_figure() -> go.Figure:
     rows = api_client.stat_sensor_over_time("gas", "minute")
@@ -816,6 +819,24 @@ def class_distribution_figure() -> go.Figure:
 
 def statistics_status(data_source: str, chart_type: str) -> str:
     return f"Showing **{data_source}** as a **{chart_type}** chart from the data API."
+
+
+def _refresh_statistics_tick(nav: str, stat_source: str, chart_type: str) -> tuple:
+    global _stats_fig_last_rebuild
+    no = gr.update()
+    if nav != "Statistics":
+        return no, no, no, no, no
+    now = time.time()
+    if now - _stats_fig_last_rebuild < _STATS_INTERVAL:
+        return no, no, no, no, no
+    _stats_fig_last_rebuild = now
+    return (
+        build_statistics_figure(stat_source, chart_type),
+        overview_figure("detections"),
+        overview_figure("gas"),
+        overview_figure("classes"),
+        overview_figure("temperature"),
+    )
 
 
 def initial_test_state() -> dict[str, str]:
@@ -1302,17 +1323,40 @@ def wire_callbacks(layout: Any) -> None:
         show_progress="hidden",
     )
 
+    def _refresh_gas_history_tick(nav: str) -> Any:
+        if nav != "Data":
+            return gr.update()
+        return gas_history_figure()
+
+    def _refresh_class_dist_tick(nav: str) -> Any:
+        if nav != "Data":
+            return gr.update()
+        return class_distribution_figure()
+
     layout.timer.tick(
-        fn=gas_history_figure,
-        inputs=None,
+        fn=_refresh_gas_history_tick,
+        inputs=[layout.nav],
         outputs=[layout.data_logs.gas_history_plot],
         show_progress="hidden",
     )
 
     layout.timer.tick(
-        fn=class_distribution_figure,
-        inputs=None,
+        fn=_refresh_class_dist_tick,
+        inputs=[layout.nav],
         outputs=[layout.data_logs.class_dist_plot],
+        show_progress="hidden",
+    )
+
+    layout.timer.tick(
+        fn=_refresh_statistics_tick,
+        inputs=[layout.nav, layout.statistics.source, layout.statistics.chart_type],
+        outputs=[
+            layout.statistics.main_plot,
+            layout.statistics.overview_detections,
+            layout.statistics.overview_gas,
+            layout.statistics.overview_classes,
+            layout.statistics.overview_temperature,
+        ],
         show_progress="hidden",
     )
 
