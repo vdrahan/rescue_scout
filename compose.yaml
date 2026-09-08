@@ -20,6 +20,24 @@ services:
     networks:
       - data
 
+  migrate:
+    image: postgres:16.9-alpine
+    restart: 'no'
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - ./backend/database/migrations:/migrations:ro
+    command: >
+      sh -c 'psql --host=db --username=$${POSTGRES_USER} --dbname=$${POSTGRES_DB}
+      --set=ON_ERROR_STOP=1 --file=/migrations/001_reference_data.sql'
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - data
+
   api:
     build:
       context: .
@@ -36,6 +54,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:' + os.getenv('API_PORT', '8000') + '/health', timeout=5).read(1)\""]
       interval: 30s
