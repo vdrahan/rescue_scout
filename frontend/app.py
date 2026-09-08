@@ -5,11 +5,11 @@ import os
 import gradio as gr
 
 try:
-    from ui.dashboard import build_dashboard
     from ui.constants import ASSET_DIR, CUSTOM_CSS
+    from ui.dashboard import build_dashboard
 except ModuleNotFoundError:  # pragma: no cover - keeps the entrypoint flexible in different launch modes
-    from frontend.ui.dashboard import build_dashboard
     from frontend.ui.constants import ASSET_DIR, CUSTOM_CSS
+    from frontend.ui.dashboard import build_dashboard
 
 
 demo = build_dashboard()

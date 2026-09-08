@@ -50,7 +50,7 @@ class I2cLcd(Lcd):
     def write(self, lines: list[str]) -> None:
         self._clear()
         addresses = (0x80, 0xC0, 0x94, 0xD4)
-        for line, addr in zip(lines, addresses):
+        for line, addr in zip(lines, addresses, strict=False):
             self._write_byte(addr, 0)
             for ch in line.ljust(self._width)[: self._width]:
                 self._write_byte(ord(ch), 1)

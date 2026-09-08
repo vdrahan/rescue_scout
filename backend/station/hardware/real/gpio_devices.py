@@ -6,12 +6,12 @@ it inside a try/except so a missing library degrades to mock instead of crashing
 
 from __future__ import annotations
 
+from gpiozero import LED as GzLED  # noqa: N811
 from gpiozero import RGBLED as GzRGBLED  # noqa: N811
 from gpiozero import Button as GzButton
-from gpiozero import LED as GzLED  # noqa: N811
 from gpiozero import TonalBuzzer  # fallback handled below
 
-from ..base import Buzzer, Button, Led, RgbLed
+from ..base import Button, Buzzer, Led, RgbLed
 
 
 class GpioLed(Led):

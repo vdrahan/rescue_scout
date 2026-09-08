@@ -10,8 +10,8 @@ from ..config import Settings
 from ..logging_conf import get_logger
 from .base import Buzzer, ClimateSensor, Device, GasSensor, Lcd, Led
 from .mock.devices import (
-    MockBuzzer,
     MockButton,
+    MockBuzzer,
     MockClimateSensor,
     MockGasSensor,
     MockLcd,
@@ -77,7 +77,7 @@ class HardwareManager:
         # Lazy imports: missing libs raise here and trigger mock fallback.
         from .real.ads1115_gas import Ads1115GasSensor
         from .real.dht_sensor import DhtClimateSensor
-        from .real.gpio_devices import GpioBuzzer, GpioButton, GpioLed, GpioRgbLed
+        from .real.gpio_devices import GpioButton, GpioBuzzer, GpioLed, GpioRgbLed
         from .real.lcd_display import I2cLcd
 
         return {

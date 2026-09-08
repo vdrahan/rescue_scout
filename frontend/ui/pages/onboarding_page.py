@@ -113,7 +113,7 @@ def render_search_workflow() -> str:
         ("Logged",       "Saved to database",     "#64748b"),
     ]
     items = []
-    for index, ((title, note, color), icon) in enumerate(zip(steps, _icons)):
+    for index, ((title, note, color), icon) in enumerate(zip(steps, _icons, strict=True)):
         items.append(
             f"""
             <div class="about-flow-step" style="--flow-color:{color}">

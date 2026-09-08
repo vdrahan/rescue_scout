@@ -5,7 +5,7 @@ from __future__ import annotations
 import random
 
 from ...logging_conf import get_logger
-from ..base import Buzzer, Button, ClimateSensor, GasSensor, Lcd, Led, RgbLed
+from ..base import Button, Buzzer, ClimateSensor, GasSensor, Lcd, Led, RgbLed
 
 log = get_logger(__name__)
 
