@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import csv
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from frontend.services import api_client
@@ -24,6 +26,69 @@ class ServiceResultTests(unittest.TestCase):
 
 
 class HandlerNoMockFallbackTests(unittest.TestCase):
+    def test_export_logs_csv_writes_each_backend_record_type(self) -> None:
+        detections = [
+            {
+                'detection_id': 11,
+                'detection_time': '2026-09-09T10:00:00',
+                'class_name': 'lying_person',
+                'confidence': 91.5,
+                'people_count': 1,
+            }
+        ]
+        events = [
+            {
+                'event_id': 12,
+                'event_time': '2026-09-09T10:01:00',
+                'event_type': 'detection_started',
+                'importance_level': 'INFO',
+                'message': 'mock mode',
+            }
+        ]
+        readings = [
+            {
+                'reading_id': 13,
+                'reading_time': '2026-09-09T10:02:00',
+                'sensor_name': 'gas',
+                'value': 42,
+                'unit': 'ppm',
+                'is_dangerous': False,
+                'message': 'normal',
+            }
+        ]
+        with (
+            patch.object(handlers.api_client, 'detections', return_value=detections),
+            patch.object(handlers.api_client, 'events', return_value=events),
+            patch.object(handlers.api_client, 'sensor_readings', return_value=readings),
+        ):
+            file_update, banner_update = handlers.export_logs_csv()
+
+        export_path = Path(file_update['value'])
+        try:
+            with export_path.open(encoding='utf-8-sig', newline='') as csv_file:
+                rows = list(csv.DictReader(csv_file))
+        finally:
+            export_path.unlink(missing_ok=True)
+
+        self.assertEqual([row['record_type'] for row in rows], ['detection', 'event', 'sensor'])
+        self.assertEqual(rows[0]['category'], 'lying_person')
+        self.assertEqual(rows[1]['category'], 'detection_started')
+        self.assertEqual(rows[2]['unit'], 'ppm')
+        self.assertTrue(file_update['visible'])
+        self.assertIn('3 records', banner_update['value'])
+
+    def test_export_logs_csv_reports_unavailable_backend(self) -> None:
+        with (
+            patch.object(handlers.api_client, 'detections', return_value=None),
+            patch.object(handlers.api_client, 'events', return_value=[]),
+            patch.object(handlers.api_client, 'sensor_readings', return_value=[]),
+        ):
+            file_update, banner_update = handlers.export_logs_csv()
+
+        self.assertIsNone(file_update['value'])
+        self.assertFalse(file_update['visible'])
+        self.assertIn('Backend unavailable', banner_update['value'])
+
     def test_operating_update_shows_station_unavailable_without_fake_data(self) -> None:
         with (
             patch.object(handlers.api_client, "camera_frame", return_value=None),

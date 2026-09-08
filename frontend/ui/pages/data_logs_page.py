@@ -26,6 +26,7 @@ class DataLogsPage:
     class_filter: gr.Dropdown
     detection_table: gr.Dataframe
     export_button: gr.Button
+    export_file: gr.File
     export_banner: gr.HTML
 
 
@@ -43,6 +44,12 @@ def build_data_logs_page() -> DataLogsPage:
 
     with gr.Group(elem_classes=["app-card", "logs-card"]):
         export_banner = gr.HTML(value="", visible=False, elem_classes=["export-banner-wrap"])
+        export_file = gr.File(
+            value=None,
+            label='CSV export',
+            interactive=False,
+            visible=False,
+        )
 
         with gr.Row(elem_classes=["logs-header"]):
             gr.HTML(
@@ -92,5 +99,6 @@ def build_data_logs_page() -> DataLogsPage:
         class_filter=class_filter,
         detection_table=detection_table,
         export_button=export_button,
+        export_file=export_file,
         export_banner=export_banner,
     )

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import base64
+import csv
 import html
-import time
+import tempfile
 from datetime import datetime
 from typing import Any
 
@@ -18,19 +19,19 @@ from .constants import (
     PAGE_DETAILS,
     PAGE_RENDER_ORDER,
     PAGE_UI_LABELS,
+    PURPLE,
     RED,
     TEST_IDS,
     TEST_LOOKUP,
     YELLOW,
-    PURPLE,
 )
 
-try:  # works when launched from frontend/ (python app.py) or in Docker
-    from services import api_client
-    from services.config import AUTO_START_DETECTION
-except ModuleNotFoundError:  # when launched as a package (frontend.app)
+try:  # package import used by tests and python -m frontend.app
     from frontend.services import api_client
     from frontend.services.config import AUTO_START_DETECTION
+except ModuleNotFoundError:  # script mode: cd frontend then python app.py
+    from services import api_client
+    from services.config import AUTO_START_DETECTION
 
 
 _PRIORITY = {
@@ -478,15 +479,77 @@ def data_kpi_cards() -> list[tuple[str, str, str, str]]:
     ]
 
 
-def export_log_message():
-    # Show a temporary notice banner, then auto-hide after ~10s.
-    notice = (
-        "<div class='export-banner'>CSV export is not connected yet. "
-        "The tables above show live data-api records.</div>"
+_CSV_FIELDS = [
+    'record_type',
+    'id',
+    'timestamp',
+    'category',
+    'value',
+    'unit',
+    'confidence_percent',
+    'people_count',
+    'importance',
+    'is_dangerous',
+    'message',
+]
+
+
+def export_logs_csv():
+    detections = api_client.detections(limit=500)
+    events = api_client.events(limit=500)
+    readings = api_client.sensor_readings(limit=500)
+    if any(records is None for records in (detections, events, readings)):
+        notice = "<div class='export-banner'>Backend unavailable. CSV was not created.</div>"
+        return gr.update(value=None, visible=False), gr.update(value=notice, visible=True)
+
+    rows: list[dict[str, Any]] = []
+    for record in detections:
+        rows.append({
+            'record_type': 'detection',
+            'id': record.get('detection_id', ''),
+            'timestamp': record.get('detection_time', ''),
+            'category': _canonical_class(record.get('class_name', '')),
+            'confidence_percent': record.get('confidence', ''),
+            'people_count': record.get('people_count', ''),
+        })
+    for record in events:
+        rows.append({
+            'record_type': 'event',
+            'id': record.get('event_id', ''),
+            'timestamp': record.get('event_time', ''),
+            'category': record.get('event_type', ''),
+            'importance': record.get('importance_level', ''),
+            'message': record.get('message', ''),
+        })
+    for record in readings:
+        rows.append({
+            'record_type': 'sensor',
+            'id': record.get('reading_id', ''),
+            'timestamp': record.get('reading_time', ''),
+            'category': record.get('sensor_name', ''),
+            'value': record.get('value', ''),
+            'unit': record.get('unit', ''),
+            'is_dangerous': record.get('is_dangerous', False),
+            'message': record.get('message', ''),
+        })
+
+    with tempfile.NamedTemporaryFile(
+        mode='w',
+        encoding='utf-8-sig',
+        newline='',
+        prefix='search-rescue-logs-',
+        suffix='.csv',
+        delete=False,
+    ) as export_file:
+        writer = csv.DictWriter(export_file, fieldnames=_CSV_FIELDS)
+        writer.writeheader()
+        writer.writerows(rows)
+
+    notice = f"<div class='export-banner'>CSV export ready: {len(rows)} records.</div>"
+    return (
+        gr.update(value=export_file.name, visible=True),
+        gr.update(value=notice, visible=True),
     )
-    yield gr.update(value=notice, visible=True)
-    time.sleep(10)
-    yield gr.update(value="", visible=False)
 
 
 def _base_figure(title: str) -> go.Figure:
@@ -932,7 +995,12 @@ def wire_operating_page(operating: Any, nav: gr.Radio) -> None:
 
 def wire_data_logs_page(data_logs: Any) -> None:
     data_logs.class_filter.change(fn=filter_detection_events, inputs=[data_logs.class_filter], outputs=[data_logs.detection_table], show_progress="hidden")
-    data_logs.export_button.click(fn=export_log_message, inputs=None, outputs=[data_logs.export_banner], show_progress="hidden")
+    data_logs.export_button.click(
+        fn=export_logs_csv,
+        inputs=None,
+        outputs=[data_logs.export_file, data_logs.export_banner],
+        show_progress='hidden',
+    )
 
 
 def wire_statistics_page(statistics: Any) -> None:
