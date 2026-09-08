@@ -4,8 +4,8 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 
-from models.event import EventIn, EventUpdate, SystemStatusIn
-from repositories import event as repo
+from ..models.event import EventIn, EventUpdate, SystemStatusIn
+from ..repositories import event as repo
 
 router = APIRouter(tags=["events & status"])
 

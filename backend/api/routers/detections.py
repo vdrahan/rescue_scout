@@ -5,8 +5,8 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 
-from models.detection import DetectionIn, DetectionUpdate
-from repositories import detection as repo
+from ..models.detection import DetectionIn, DetectionUpdate
+from ..repositories import detection as repo
 
 router = APIRouter(tags=["detections"])
 

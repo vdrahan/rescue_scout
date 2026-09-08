@@ -5,7 +5,7 @@ from typing import Any
 
 import psycopg2.extras
 
-from database import db
+from ..database import db
 
 
 def get_many(

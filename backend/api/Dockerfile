@@ -21,7 +21,7 @@ COPY --from=builder /root/.local /home/appuser/.local
 
 ENV PATH="/home/appuser/.local/bin:$PATH"
 
-COPY --chown=appuser:appuser backend/api/ ./
+COPY --chown=appuser:appuser backend/api/ ./api/
 
 ARG API_PORT=8000
 ENV API_PORT=${API_PORT}
@@ -30,4 +30,4 @@ EXPOSE ${API_PORT}
 
 USER appuser
 
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${API_PORT}"]
+CMD ["sh", "-c", "uvicorn api.main:app --host 0.0.0.0 --port ${API_PORT}"]

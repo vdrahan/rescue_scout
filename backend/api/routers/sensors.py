@@ -5,8 +5,8 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 
-from models.sensor import SensorReadingIn
-from repositories import sensor as repo
+from ..models.sensor import SensorReadingIn
+from ..repositories import sensor as repo
 
 router = APIRouter(tags=["sensors"])
 
