@@ -1,5 +1,9 @@
 # Project One — documentation
 
+> **Reference material:** these are the original course starter instructions.
+> The active application is documented in the repository root README.md and
+> implemented in backend/ and frontend/.
+
 Read these docs in order for the full path from a prepared SD image to a running demo and production autostart.
 
 | #   | Document                                    | Purpose                                                                                            |

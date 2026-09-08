@@ -158,6 +158,7 @@ activemq-data/
 .venv
 .venv-frontend/
 .venv-station/
+.venv-api/
 env/
 venv/
 ENV/

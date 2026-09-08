@@ -103,7 +103,7 @@ It will contain simple user instructions          |
 | **Debugging**          | This page is used for testing and development.      |
 
 
-| **Link to kickoff codebase** | [[https://github.com/howest-mct/2025-2026-ProjectOne-CTAI-YourName]](https://github.com/howest-mct/2025-2026-ProjectOne-CTAI-YourName]) |
+| **Link to codebase** | [github.com/howest-mct/2025-26-projectone-ctai-VladyslavDrahan](https://github.com/howest-mct/2025-26-projectone-ctai-VladyslavDrahan) |
 | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
 | **Extra pages (optional)**   |                                                                                                                                         |
 
