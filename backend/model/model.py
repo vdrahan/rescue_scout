@@ -46,7 +46,7 @@ trained_model = get_path_from_env(
     runs_dir / model_name / "weights" / "best.pt"
 )
 
-default_rtsp_url = os.getenv("RTSP_CAMERA_1_URL", "rtsp://Stickk:12345678@172.20.10.6:554/stream1")
+default_rtsp_url = os.getenv("RTSP_CAMERA_1_URL", "")
 auto_train_model = os.getenv("AUTO_TRAIN_MODEL", "false").lower() in {"1", "true", "yes", "on"}
 
 device = 0 if torch.cuda.is_available() else "cpu"
