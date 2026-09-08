@@ -117,8 +117,7 @@ class DataApiSink:
                 log.warning("sink failed to post %s: %s", kind, exc)
 
     def _post_detection(self, payload: dict) -> None:
-        class_id = self._resolve(self._class_map, payload["class_name"],
-                                 self._refresh_maps)
+        class_id = self._resolve_class(payload["class_name"])
         if class_id is None:
             log.warning("no class_id for %s, skipping detection", payload["class_name"])
             return
@@ -129,8 +128,7 @@ class DataApiSink:
         })
 
     def _post_sensor(self, payload: dict) -> None:
-        sensor_id = self._resolve(self._sensor_map, payload["sensor_name"],
-                                  self._refresh_maps)
+        sensor_id = self._resolve_sensor(payload["sensor_name"])
         if sensor_id is None:
             log.warning("no sensor_id for %s, skipping reading", payload["sensor_name"])
             return
@@ -144,11 +142,19 @@ class DataApiSink:
     def _post_event(self, payload: dict) -> None:
         self._post("/events", payload)
 
-    def _resolve(self, mapping: dict[str, int], name: str, refresh) -> int | None:
-        if name in mapping:
-            return mapping[name]
-        refresh()  # maps may not have been loaded yet (data-api started late)
-        return self._class_map.get(name) or self._sensor_map.get(name)
+    def _resolve_class(self, name: str) -> int | None:
+        class_id = self._class_map.get(name)
+        if class_id is None:
+            self._refresh_maps()  # data-api may have started after the station
+            class_id = self._class_map.get(name)
+        return class_id
+
+    def _resolve_sensor(self, name: str) -> int | None:
+        sensor_id = self._sensor_map.get(name)
+        if sensor_id is None:
+            self._refresh_maps()
+            sensor_id = self._sensor_map.get(name)
+        return sensor_id
 
     def _post(self, path: str, body: dict[str, Any]) -> None:
         assert self._client is not None
