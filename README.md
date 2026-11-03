@@ -4,7 +4,7 @@ See [PD](PD.md)
 
 ---
 
-For Docs, see [Docs/README.md](Docs/README.md)
+For Docs, see [examples/Docs/README.md](examples/Docs/README.md)
 
 ## 1. Project identity
 
@@ -301,7 +301,7 @@ docker compose up --build
 
 ```bash
 # data-api (needs DATABASE_URL pointing at a Postgres)
-cd backend/api && pip install -r requirements.txt && uvicorn main:app --port 8000
+pip install -r backend/api/requirements.txt && uvicorn backend.api.main:app --reload --port 8000
 
 # station (mock, separate terminal)
 cd backend && pip install -r station/requirements.txt
