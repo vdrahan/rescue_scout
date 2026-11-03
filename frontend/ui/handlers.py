@@ -11,18 +11,17 @@ import plotly.graph_objects as go
 
 from .constants import (
     ASSET_LOGO,
-    BLUE,
     DEFAULT_PAGE,
     GREEN,
     ORANGE,
     PAGE_DETAILS,
     PAGE_RENDER_ORDER,
     PAGE_UI_LABELS,
+    PURPLE,
     RED,
     TEST_IDS,
     TEST_LOOKUP,
     YELLOW,
-    PURPLE,
 )
 
 try:  # works when launched from frontend/ (python app.py) or in Docker
@@ -622,7 +621,9 @@ def data_kpi_cards() -> list[tuple[str, str, str, str]]:
 
 
 def export_detections_csv(class_filter: str):
-    import csv, tempfile
+    import csv
+    import tempfile
+
     from .constants import DETECTION_HEADERS
     rows = filter_detection_events(class_filter)
     tmp = tempfile.NamedTemporaryFile(
@@ -634,7 +635,9 @@ def export_detections_csv(class_filter: str):
 
 
 def export_gas_csv():
-    import csv, tempfile
+    import csv
+    import tempfile
+
     from .constants import GAS_ALERT_HEADERS
     rows = gas_alert_rows()
     tmp = tempfile.NamedTemporaryFile(

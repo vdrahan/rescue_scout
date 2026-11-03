@@ -8,8 +8,8 @@ import argparse
 import time
 
 try:
-    import RPi.GPIO as GPIO
     import dht11
+    import RPi.GPIO as GPIO
     import smbus
     HW_AVAILABLE = True
 except ImportError:

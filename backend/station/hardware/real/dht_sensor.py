@@ -8,8 +8,8 @@ from ..base import ClimateSensor
 class DhtClimateSensor(ClimateSensor):
     def __init__(self, dev_id: str, name: str, pin: int = 25):
         super().__init__(dev_id, name)
-        import RPi.GPIO as GPIO  # noqa: WPS433
         import dht11  # noqa: WPS433
+        import RPi.GPIO as GPIO  # noqa: WPS433
 
         GPIO.setmode(GPIO.BCM)
         GPIO.setwarnings(False)

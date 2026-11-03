@@ -4,8 +4,15 @@ from dataclasses import dataclass
 
 import gradio as gr
 
-from ..constants import TEST_GROUPS, TEST_IDS
-from ..handlers import diagnostic_summary_html, diagnostic_progress, initial_test_state, system_events_html, test_header_html, test_rows_html
+from ..constants import TEST_GROUPS
+from ..handlers import (
+    diagnostic_progress,
+    diagnostic_summary_html,
+    initial_test_state,
+    system_events_html,
+    test_header_html,
+    test_rows_html,
+)
 
 
 @dataclass
@@ -80,7 +87,7 @@ def build_debugging_page() -> DebuggingPage:
                 reset_button = gr.Button("Reset", size="md")
                 run_all_button = gr.Button("Run All", variant="primary", size="md")
 
-            for group_name, accent, tests in TEST_GROUPS:
+            for group_name, _accent, tests in TEST_GROUPS:
                 with gr.Accordion(
                     label=group_name,
                     open=(group_name == "Visual"),

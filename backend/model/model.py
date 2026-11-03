@@ -1,15 +1,14 @@
-from pathlib import Path
 import os
 import socket
+from pathlib import Path
 
 os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;udp|max_delay;0|fflags;nobuffer|flags;low_delay"
 
 import cv2
+import gradio as gr
+import PIL.Image as Image
 import torch
 from ultralytics import YOLO
-import PIL.Image as Image
-import gradio as gr
-
 
 model_path = Path(__file__).parent
 backend_path = model_path.parent

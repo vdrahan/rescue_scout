@@ -7,8 +7,7 @@ for the debugging hardware tests.
 
 from __future__ import annotations
 
-from ..base import Buzzer, Button, Led, RgbLed, RgbModule
-
+from ..base import Button, Buzzer, Led, RgbLed, RgbModule
 
 PWM_FREQUENCY = 1000
 
@@ -87,7 +86,7 @@ class GpioRgbLed(_LgpioDevice, RgbLed):
 
     def set_color(self, r: float, g: float, b: float) -> None:
         self._color = (r, g, b)
-        for pin, duty in zip(self._pins, self._color):
+        for pin, duty in zip(self._pins, self._color, strict=False):
             self._pwm(pin, 100.0 - duty)  # common anode: invert duty
 
     def value(self):

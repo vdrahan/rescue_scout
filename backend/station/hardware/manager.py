@@ -13,14 +13,14 @@ from ..config import Settings
 from ..logging_conf import get_logger
 from .base import Buzzer, ClimateSensor, Device, GasSensor, Lcd, Led, RgbLed, RgbModule
 from .mock.devices import (
-    MockBuzzer,
     MockButton,
+    MockBuzzer,
     MockClimateSensor,
     MockGasSensor,
     MockLcd,
     MockLed,
-    MockRgbModule,
     MockRgbLed,
+    MockRgbModule,
 )
 
 log = get_logger(__name__)
@@ -124,8 +124,8 @@ class HardwareManager:
 
         try:
             from .real.gpio_devices import (
-                GpioBuzzer,
                 GpioButton,
+                GpioBuzzer,
                 GpioLed,
                 GpioRgbLed,
                 GpioRgbModule,

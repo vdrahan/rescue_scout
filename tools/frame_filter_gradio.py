@@ -1,9 +1,8 @@
-from pathlib import Path
 import shutil
+from pathlib import Path
 
 import gradio as gr
 from PIL import Image
-
 
 IMAGE_EXTENSIONS = {
     ".jpg",

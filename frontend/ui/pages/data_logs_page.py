@@ -8,10 +8,10 @@ from ..handlers import (
     CANONICAL_CLASS_CHOICES,
     class_distribution_figure,
     data_kpi_cards,
-    gas_kpi_card_html,
     detection_events_html,
     gas_alerts_html,
     gas_history_figure,
+    gas_kpi_card_html,
     metric_html,
 )
 
