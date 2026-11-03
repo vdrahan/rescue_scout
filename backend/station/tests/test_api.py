@@ -79,11 +79,11 @@ def test_hardware_status_and_tests(client):
     status = client.get("/api/hardware/status").json()
     assert status["mode"] == "mock"
     # gas is a cache filled by the 2 s gas-poll thread; wait for the first poll.
-    deadline = time.time() + 5.0
-    while status["gas"]["ppm"] is None and time.time() < deadline:
+    deadline = time.monotonic() + 5.0
+    while status["gas"]["ppm"] is None and time.monotonic() < deadline:
         time.sleep(0.2)
         status = client.get("/api/hardware/status").json()
-    assert status["gas"]["ppm"] is not None
+    assert status["gas"]["ppm"] is not None, "gas cache not filled within 5 s"
 
     assert client.post("/api/hardware/test/buzzer").json()["status"] == "passed"
     assert client.post("/api/hardware/test/rgb_module").json()["status"] == "passed"
