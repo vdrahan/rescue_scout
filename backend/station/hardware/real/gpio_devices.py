@@ -108,7 +108,7 @@ class GpioRgbLed(_LgpioDevice, RgbLed):
 
 
 class GpioRgbModule(_LgpioDevice, RgbModule):
-    """Three-pin digital RGB module from tests/test.py (RGB1_R/G/B)."""
+    """Three-pin digital RGB module from tools/hardware_check.py (RGB1_R/G/B)."""
 
     def __init__(self, dev_id: str, name: str, r: int, g: int, b: int, chip: int = 0):
         RgbModule.__init__(self, dev_id, name)

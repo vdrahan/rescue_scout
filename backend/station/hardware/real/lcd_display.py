@@ -1,6 +1,6 @@
 """Minimal I2C HD44780 LCD driver (smbus2, optional import).
 
-Mirrors the proven low-level sequence from the project's ``tests/test.py`` so it
+Mirrors the proven low-level sequence from the project's ``tools/hardware_check.py`` so it
 works with the same 0x27 PCF8574 backpack, without pulling an extra LCD library.
 """
 
