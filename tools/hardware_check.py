@@ -31,6 +31,7 @@ except ImportError:
 STATION_API = "http://localhost:8001"
 
 BUZZER = 5
+# NOTE: differs from backend/station/config.py (the station's source of truth); verify wiring before using CLI mode
 RGB1_R = 26
 RGB1_G = 16
 RGB1_B = 6
@@ -301,7 +302,7 @@ def run_gradio():
     with gr.Blocks(title="Hardware Test Console") as demo:
         gr.Markdown("# Hardware Test Console")
         gr.Markdown(
-            "Tests run via the **station API** (`localhost:8000`) — the station service must be running.\n\n"
+            "Tests run via the **station API** (`localhost:8001`) — the station service must be running.\n\n"
             "To run direct GPIO tests without the station, use `python tools/hardware_check.py --interface cli` "
             "(stop the station service first)."
         )

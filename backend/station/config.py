@@ -1,8 +1,8 @@
 """Central configuration for the station service.
 
 All tunables live here and are read from environment variables (or a local
-``.env``) via pydantic-settings. Hardware pin defaults match the existing
-``tools/hardware_check.py`` wiring so real mode works on the project's Raspberry Pi.
+``.env``) via pydantic-settings. Hardware pin defaults here are the source of truth for the station;
+tools/hardware_check.py wiring differs for the RGB pins.
 """
 
 from __future__ import annotations
@@ -60,7 +60,7 @@ class Settings(BaseSettings):
     camera_stream_max_width: int = 640
     camera_stream_quality: int = 50
 
-    # --- Hardware pins (BCM) — defaults from tools/hardware_check.py wiring ---
+    # --- Hardware pins (BCM) — defaults; config.py is the source of truth (tools/hardware_check.py RGB pins differ) ---
     gpio_chip: int = 0
     buzzer_pin: int = 5
     system_led_pin: int = 23     # LED1
