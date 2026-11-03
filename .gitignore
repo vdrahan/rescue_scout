@@ -241,3 +241,6 @@ graphify-out/
 PRODUCT.md
 DESIGN.md
 .superpowers/
+.lgd-nfy*
+.agents/
+.codex/
