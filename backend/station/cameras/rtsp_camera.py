@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 import time
+from urllib.parse import urlsplit, urlunsplit
 
 import numpy as np
 
@@ -27,6 +28,18 @@ RTSP_FFMPEG_OPTIONS = (
 )
 os.environ.setdefault("OPENCV_FFMPEG_CAPTURE_OPTIONS", RTSP_FFMPEG_OPTIONS)
 
+
+def redact_url(url: str) -> str:
+    """Hide the password in a camera URL before it reaches logs."""
+    parts = urlsplit(url)
+    if parts.password is None:
+        return url
+    host = parts.hostname or ""
+    if parts.port:
+        host = f"{host}:{parts.port}"
+    return urlunsplit(parts._replace(netloc=f"{parts.username}:***@{host}"))
+
+
 _RECONNECT_DELAY = 1.0  # seconds between reconnect attempts after failure
 
 # Frames to grab before retrieving. The background CameraReader drains the active
@@ -44,6 +57,11 @@ class _CvCamera(CameraSource):
         self._next_open: float = 0.0  # monotonic timestamp; 0 = open immediately
         self._open()
 
+    def _scrub(self, exc: Exception) -> str:
+        # OpenCV/ffmpeg errors may embed the source URL; mask its password.
+        src = str(self._source)
+        return str(exc).replace(src, redact_url(src))
+
     def _open(self) -> None:
         self.close()
         try:
@@ -55,7 +73,7 @@ class _CvCamera(CameraSource):
                 self.status = "error"
                 self.last_error = "Camera could not be opened"
                 self._next_open = time.monotonic() + _RECONNECT_DELAY
-                log.warning("Camera %s could not open source %s", self.id, self._source)
+                log.warning("Camera %s could not open source %s", self.id, redact_url(str(self._source)))
                 return
             self._cap = cap
             self._next_open = 0.0
@@ -63,9 +81,9 @@ class _CvCamera(CameraSource):
             self.last_error = ""
         except Exception as exc:  # noqa: BLE001
             self.status = "error"
-            self.last_error = str(exc)
+            self.last_error = self._scrub(exc)
             self._next_open = time.monotonic() + _RECONNECT_DELAY
-            log.warning("Camera %s init failed: %s", self.id, exc)
+            log.warning("Camera %s init failed: %s", self.id, self.last_error)
 
     def read(self) -> np.ndarray | None:
         if self._cap is None:
@@ -89,10 +107,10 @@ class _CvCamera(CameraSource):
             return frame[..., ::-1].copy()  # BGR -> RGB
         except Exception as exc:  # noqa: BLE001
             self.status = "error"
-            self.last_error = str(exc)
+            self.last_error = self._scrub(exc)
             self._next_open = time.monotonic() + _RECONNECT_DELAY
             self.close()
-            log.warning("Camera %s read failed: %s", self.id, exc)
+            log.warning("Camera %s read failed: %s", self.id, self.last_error)
             return None
 
     def close(self) -> None:
