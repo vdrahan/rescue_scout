@@ -302,7 +302,7 @@ def run_gradio():
         gr.Markdown("# Hardware Test Console")
         gr.Markdown(
             "Tests run via the **station API** (`localhost:8000`) — the station service must be running.\n\n"
-            "To run direct GPIO tests without the station, use `python test.py --interface cli` "
+            "To run direct GPIO tests without the station, use `python tools/hardware_check.py --interface cli` "
             "(stop the station service first)."
         )
 
