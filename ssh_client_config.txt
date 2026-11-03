@@ -3,15 +3,15 @@
 # (create the file if it doesn't exist: mkdir -p ~/.ssh && nano ~/.ssh/config)
 
 Host rpi
-    HostName 172.20.10.9
-    User student
+    HostName <pi-ip>
+    User <user>
     Port 22
     # ServerAliveInterval 60  # uncomment if the connection keeps dropping
 
 # You can also connect by hostname (works on the same WiFi network):
 # Host rpi-local
-#     HostName project1-olive-melon.local
-#     User student
+#     HostName <pi-hostname>.local
+#     User <user>
 
 # === Usage ===
 # ssh rpi                        — connect via SSH
@@ -27,5 +27,5 @@ Host rpi
 # === Add SSH key from a new device (passwordless) ===
 # On the new device:
 #   ssh-keygen -t ed25519          # if you don't have a key yet
-#   ssh-copy-id student@172.20.10.9
+#   ssh-copy-id <user>@<pi-ip>
 # After this, no password is needed
