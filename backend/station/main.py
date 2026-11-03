@@ -5,7 +5,6 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 
 from . import __version__
 from .api import cameras, detection, hardware, health, status, system
@@ -77,12 +76,6 @@ async def lifespan(app: FastAPI):
 
 def create_app() -> FastAPI:
     app = FastAPI(title="RC SAR Station", version=__version__, lifespan=lifespan)
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
     for module in (health, status, detection, cameras, hardware, system):
         app.include_router(module.router)
     return app
