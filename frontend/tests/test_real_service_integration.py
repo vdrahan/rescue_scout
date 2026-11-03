@@ -26,7 +26,15 @@ class ServiceResultTests(unittest.TestCase):
 
 
 class HandlerNoMockFallbackTests(unittest.TestCase):
-    def test_export_logs_csv_writes_each_backend_record_type(self) -> None:
+    def _read_export(self, file_update) -> list[list[str]]:
+        export_path = Path(file_update['value'])
+        try:
+            with export_path.open(encoding='utf-8', newline='') as csv_file:
+                return list(csv.reader(csv_file))
+        finally:
+            export_path.unlink(missing_ok=True)
+
+    def test_export_detections_csv_writes_backend_rows(self) -> None:
         detections = [
             {
                 'detection_id': 11,
@@ -36,58 +44,45 @@ class HandlerNoMockFallbackTests(unittest.TestCase):
                 'people_count': 1,
             }
         ]
-        events = [
-            {
-                'event_id': 12,
-                'event_time': '2026-09-09T10:01:00',
-                'event_type': 'detection_started',
-                'importance_level': 'INFO',
-                'message': 'mock mode',
-            }
-        ]
+        with patch.object(handlers.api_client, 'detections', return_value=detections):
+            file_update = handlers.export_detections_csv('All classes')
+
+        self.assertTrue(file_update['visible'])
+        rows = self._read_export(file_update)
+        self.assertEqual(rows[0], ['ID', 'Class', 'Confidence', 'Date', 'Time', 'Priority'])
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[1][:3], ['#11', 'lying_person', '91%'])
+
+    def test_export_gas_csv_writes_backend_rows(self) -> None:
         readings = [
             {
                 'reading_id': 13,
                 'reading_time': '2026-09-09T10:02:00',
                 'sensor_name': 'gas',
-                'value': 42,
+                'value': 260,
                 'unit': 'ppm',
-                'is_dangerous': False,
-                'message': 'normal',
+                'is_dangerous': True,
+                'message': 'danger',
             }
         ]
-        with (
-            patch.object(handlers.api_client, 'detections', return_value=detections),
-            patch.object(handlers.api_client, 'events', return_value=events),
-            patch.object(handlers.api_client, 'sensor_readings', return_value=readings),
-        ):
-            file_update, banner_update = handlers.export_logs_csv()
+        with patch.object(handlers.api_client, 'sensor_readings', return_value=readings):
+            file_update = handlers.export_gas_csv()
 
-        export_path = Path(file_update['value'])
-        try:
-            with export_path.open(encoding='utf-8-sig', newline='') as csv_file:
-                rows = list(csv.DictReader(csv_file))
-        finally:
-            export_path.unlink(missing_ok=True)
+        rows = self._read_export(file_update)
+        self.assertEqual(rows[0], ['Time', 'Reading', 'Level', 'Action'])
+        self.assertEqual(rows[1][:3], ['10:02:00', '260 ppm', 'Critical'])
 
-        self.assertEqual([row['record_type'] for row in rows], ['detection', 'event', 'sensor'])
-        self.assertEqual(rows[0]['category'], 'lying_person')
-        self.assertEqual(rows[1]['category'], 'detection_started')
-        self.assertEqual(rows[2]['unit'], 'ppm')
-        self.assertTrue(file_update['visible'])
-        self.assertIn('3 records', banner_update['value'])
-
-    def test_export_logs_csv_reports_unavailable_backend(self) -> None:
+    def test_exports_report_unavailable_backend_instead_of_fake_rows(self) -> None:
         with (
             patch.object(handlers.api_client, 'detections', return_value=None),
-            patch.object(handlers.api_client, 'events', return_value=[]),
-            patch.object(handlers.api_client, 'sensor_readings', return_value=[]),
+            patch.object(handlers.api_client, 'sensor_readings', return_value=None),
         ):
-            file_update, banner_update = handlers.export_logs_csv()
+            detection_rows = self._read_export(handlers.export_detections_csv('All classes'))
+            gas_rows = self._read_export(handlers.export_gas_csv())
 
-        self.assertIsNone(file_update['value'])
-        self.assertFalse(file_update['visible'])
-        self.assertIn('Backend unavailable', banner_update['value'])
+        for rows in (detection_rows, gas_rows):
+            self.assertEqual(len(rows), 2)  # header + one status row, no invented data
+            self.assertEqual(rows[1][0], 'Backend unavailable')
 
     def test_operating_update_shows_station_unavailable_without_fake_data(self) -> None:
         with (
@@ -100,7 +95,7 @@ class HandlerNoMockFallbackTests(unittest.TestCase):
             )
 
         self.assertIsNone(frame)
-        self.assertIn("Station unavailable", camera_status)
+        self.assertIn("Station Offline", camera_status)
         self.assertEqual(detection_count, 0)
         self.assertEqual(fps, 0)
         self.assertEqual(duration, "Station unavailable")
@@ -131,7 +126,7 @@ class HandlerNoMockFallbackTests(unittest.TestCase):
             )
 
         self.assertIsNone(frame)
-        self.assertIn("No frame available", camera_status)
+        self.assertIn("No Frame Available", camera_status)
         self.assertEqual(detection_count, 0)
         self.assertEqual(fps, 0)
         self.assertEqual(duration, "00:00:12")
@@ -161,8 +156,7 @@ class HandlerNoMockFallbackTests(unittest.TestCase):
         ):
             _, camera_status, *_ = handlers.operating_update(False, "detection", 45)
 
-        self.assertIn("Camera unavailable", camera_status)
-        self.assertIn("stream stopped", camera_status)
+        self.assertIn("Camera Reconnecting", camera_status)
 
     def test_toggle_ai_does_not_enable_when_station_start_fails(self) -> None:
         with (

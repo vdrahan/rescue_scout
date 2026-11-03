@@ -57,15 +57,17 @@ class _NoneCamera(CameraSource):
         return None
 
 
-def test_reader_survives_failed_read_and_drops_stale_cache():
+def test_reader_survives_failed_read_and_keeps_last_frame():
     mgr = CameraManager(_mock_settings())
     reader = CameraReader(mgr, _mock_settings())
     reader._tick()
-    assert mgr.cached() is not None
+    last = mgr.cached()
+    assert last is not None
 
     mgr._cameras[mgr.active_id] = _NoneCamera()
     assert reader._tick() is False
-    assert mgr.cached() is None  # don't serve a stale frame once the source errors
+    # Keep the last good frame so the UI can show "Camera Reconnecting - Showing last frame".
+    assert mgr.cached() is last
 
 
 class _FakeCams:

@@ -70,6 +70,8 @@ def test_rtsp_camera_reopens_after_read_failure(monkeypatch):
     _FakeCv2.retrieve_calls = 0
     _FakeCv2.captures = []
     monkeypatch.setitem(sys.modules, "cv2", _FakeCv2)
+    # Production waits _RECONNECT_DELAY after a failed read before reopening; skip it here.
+    monkeypatch.setattr("station.cameras.rtsp_camera._RECONNECT_DELAY", 0.0)
 
     camera = RtspCamera("detection", "Detection Camera", "rtsp://example/stream")
 
