@@ -1,22 +1,10 @@
-# RC Car Search-and-Rescue System
+# RC CAR search-and-rescue system - version 2
 
-Project definition: [PD.md](PD.md)
+See [PD](PD.md)
 
 ---
 
-Course reference material: [examples/Docs/README.md](examples/Docs/README.md)
-
-The runnable implementation lives in backend/api, backend/station, and
-frontend. The examples directory contains the original course starter and
-hardware smoke-test material; it is not part of the deployed application.
-
-## Project status
-
-This repository contains a working end-to-end prototype: PostgreSQL persistence,
-a FastAPI data API, a separate FastAPI detection station, a Gradio operator UI,
-mock hardware/cameras for laptop demonstrations, and real-mode adapters for the
-Raspberry Pi deployment. It is a prototype for supervised demonstrations, not a
-certified emergency-response product.
+For Docs, see [Docs/README.md](Docs/README.md)
 
 ## 1. Project identity
 
@@ -297,7 +285,7 @@ fully **mocked** by default, so the whole stack works on a laptop with no model,
 camera or Raspberry Pi hardware.
 
 ```
-Copy-Item .env.example .env  # PowerShell; adjust values and never commit secrets
+cp .env.example .env     # adjust values; never commit real secrets
 ```
 
 ### A. Docker Compose (laptop / everything mocked)
@@ -311,27 +299,17 @@ docker compose up --build
 
 ### B. Local development (no Docker)
 
-```powershell
-# Data API (terminal 1; DATABASE_URL must point to PostgreSQL)
-py -3.12 -m venv .venv-api
-.\.venv-api\Scripts\python.exe -m pip install -r backend\api\requirements.txt
-.\.venv-api\Scripts\python.exe -m uvicorn backend.api.main:app --port 8000
+```bash
+# data-api (needs DATABASE_URL pointing at a Postgres)
+cd backend/api && pip install -r requirements.txt && uvicorn main:app --port 8000
 
-# Station (terminal 2; mock mode)
-py -3.12 -m venv .venv-station
-.\.venv-station\Scripts\python.exe -m pip install -r backend\station\requirements.txt
-Set-Location backend
-$env:STATION_PORT = '8001'
-$env:DETECTION_MODE = 'mock'
-$env:HARDWARE_MODE = 'mock'
-..\.venv-station\Scripts\python.exe -m station
+# station (mock, separate terminal)
+cd backend && pip install -r station/requirements.txt
+STATION_PORT=8001 DETECTION_MODE=mock HARDWARE_MODE=mock python -m station
 
-# Frontend (terminal 3, started from the repository root)
-py -3.12 -m venv .venv-frontend
-.\.venv-frontend\Scripts\python.exe -m pip install -r frontend\requirements.txt
-$env:STATION_URL = 'http://localhost:8001'
-$env:API_URL = 'http://localhost:8000'
-.\.venv-frontend\Scripts\python.exe -m frontend.app
+# frontend (separate terminal)
+cd frontend && pip install -r requirements.txt
+STATION_URL=http://localhost:8001 API_URL=http://localhost:8000 python app.py
 ```
 
 > The three services have intentionally separate `requirements.txt` files and
