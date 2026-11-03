@@ -160,7 +160,7 @@ def render_display_cards() -> str:
         {
             "title": "Detection",
             "tone": "orange",
-            "screen": ["PERSON DETECTION", "CLASS: lying_person, TIME: 12:30:59"],
+            "screen": ["PERSON DETECTED", " lying_person, 12:30:59"],
             "note": "Shows the current active detection alert.",
         },
         {
@@ -172,9 +172,15 @@ def render_display_cards() -> str:
         {
             "title": "Gas",
             "tone": "red",
-            "screen": ["GAS: 145 ppm - NORMAL", "AREA SAFE"],
-            "note": "Shows gas sensor value and area safety state.",
+            "screen": ["GAS DETECTED!", "MQ-2: 275 ppm DANGER"],
+            "note": "Shows warning when gas levels are high.",
         },
+        {
+            "title": "Temperature",
+            "tone": "yellow",
+            "screen": ["HIGH TEMPERATURE!", "TEMP: 42C WARNING"],
+            "note": "Shows warning when temperature is high.",
+        }
     ]
     cards = []
     for screen in screens:
@@ -279,7 +285,7 @@ def build_onboarding_page() -> OnboardingPage:
         with gr.Group(elem_classes=["app-card", "about-card"]):
             gr.Markdown("### 7 - Gas Sensor Warnings", elem_classes=["compact-md"])
             gr.Markdown(
-                "<div class='notice-info'><strong>MQ-2 on GPIO 18</strong> — Detects combustible gases and smoke.</div><br>"
+                "<div class='notice-info'><strong>MQ-2</strong> — Detects combustible gases and smoke.</div><br>"
                 "<div class='notice-ok'>&lt; 200 ppm — Normal, safe to proceed</div><br>"
                 "<div class='notice-warn'>200–250 ppm — Warning, use caution</div><br>"
                 "<div class='about-critical'>&gt; 250 ppm — Critical, do not enter</div>"

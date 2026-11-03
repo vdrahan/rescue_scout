@@ -8,6 +8,13 @@ WORKDIR /app
 # STATION_PROFILE: "base" (mock, light) or "full" (real detection + hardware).
 ARG STATION_PROFILE=base
 
+# gcc is required to build RPi.GPIO (C extension) for the full hardware profile.
+RUN if [ "$STATION_PROFILE" = "full" ]; then \
+        apt-get update \
+        && apt-get install -y --no-install-recommends gcc python3-dev \
+        && rm -rf /var/lib/apt/lists/*; \
+    fi
+
 # Copy dependency files first so layers cache well.
 COPY backend/station/requirements.txt ./requirements.txt
 COPY backend/station/requirements-ml.txt ./requirements-ml.txt
@@ -39,7 +46,8 @@ RUN if [ "$STATION_PROFILE" = "full" ]; then \
 RUN useradd --create-home appuser
 
 COPY --from=builder /root/.local /home/appuser/.local
-ENV PATH="/home/appuser/.local/bin:$PATH"
+ENV PATH="/home/appuser/.local/bin:$PATH" \
+    PYTHONPATH="/home/appuser/.local/lib/python3.12/site-packages"
 
 # Package lives at /app/station so `python -m station` resolves.
 COPY --chown=appuser:appuser backend/station/ ./station/

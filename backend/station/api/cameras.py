@@ -24,6 +24,8 @@ def set_active(body: SetActiveCameraIn,
                services: AppServices = Depends(get_services)) -> dict[str, Any]:
     if not services.cameras.set_active(body.camera_id):
         raise HTTPException(status_code=404, detail=f"Unknown camera: {body.camera_id}")
+    services.hardware.set_fpv_led(body.camera_id == "fpv")
+    services.hardware.set_detection_feed_led(body.camera_id == "detection")
     return {"active": services.cameras.active_id, "cameras": services.cameras.list()}
 
 
@@ -33,11 +35,18 @@ def frame(camera_id: str, services: AppServices = Depends(get_services)) -> Resp
     if not cams.has(camera_id):
         raise HTTPException(status_code=404, detail=f"Unknown camera: {camera_id}")
 
-    if camera_id == cams.active_id:
-        data = services.detection.frame_jpeg()  # annotated when detection is on
+    if camera_id == cams.inference_source_id() and services.detection.active:
+        # Detection camera with AI on → annotated frame from inference
+        data = services.detection.frame_jpeg()
     else:
-        preview = cams.read_one(camera_id)
-        data = to_jpeg(preview) if preview is not None else to_jpeg(
-            placeholder(services.settings.frame_width, services.settings.frame_height, "no signal")
+        # FPV or detection with AI off → cached frame, aggressively downscaled and
+        # low-quality for a minimum-latency live feed (encoded once per frame).
+        s = services.settings
+        data = cams.read_one_jpeg(
+            camera_id,
+            max_width=s.camera_stream_max_width or None,
+            quality=s.camera_stream_quality,
         )
+        if data is None:
+            data = to_jpeg(placeholder(s.frame_width, s.frame_height, "no signal"))
     return Response(content=data, media_type="image/jpeg")

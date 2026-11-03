@@ -1,0 +1,31 @@
+# === SSH config for connecting to Raspberry Pi ===
+# Copy this to ~/.ssh/config on EVERY machine you want to connect from
+# (create the file if it doesn't exist: mkdir -p ~/.ssh && nano ~/.ssh/config)
+
+Host rpi
+    HostName 172.20.10.9
+    User student
+    Port 22
+    # ServerAliveInterval 60  # uncomment if the connection keeps dropping
+
+# You can also connect by hostname (works on the same WiFi network):
+# Host rpi-local
+#     HostName project1-olive-melon.local
+#     User student
+
+# === Usage ===
+# ssh rpi                        — connect via SSH
+# ssh rpi "ls ~/project"         — run a command
+# scp rpi:/path/file ./          — copy a file from Pi
+# rsync -av rpi:/path/ ./folder/ — sync a folder
+
+# === VS Code Remote SSH ===
+# 1. Install extension: Remote - SSH (ms-vscode-remote.remote-ssh)
+# 2. Ctrl+Shift+P → "Remote-SSH: Connect to Host" → select "rpi"
+# 3. VS Code will open the folder on Pi as if it were local
+
+# === Add SSH key from a new device (passwordless) ===
+# On the new device:
+#   ssh-keygen -t ed25519          # if you don't have a key yet
+#   ssh-copy-id student@172.20.10.9
+# After this, no password is needed

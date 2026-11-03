@@ -4,14 +4,8 @@ from dataclasses import dataclass
 
 import gradio as gr
 
-from ..constants import TEST_GROUPS
-from ..handlers import (
-    diagnostic_progress,
-    diagnostic_summary_html,
-    initial_test_state,
-    test_header_html,
-    test_rows_html,
-)
+from ..constants import TEST_GROUPS, TEST_IDS
+from ..handlers import diagnostic_summary_html, diagnostic_progress, initial_test_state, system_events_html, test_header_html, test_rows_html
 
 
 @dataclass
@@ -24,20 +18,52 @@ class DebuggingPage:
     test_buttons: dict[str, gr.Button]
     test_headers: dict[str, gr.HTML]
     test_outputs: dict[str, gr.HTML]
+    restart_frontend_btn: gr.Button
+    reboot_pi_btn: gr.Button
+    system_control_status: gr.HTML
+
+
+def _system_controls_cards_html() -> str:
+    return """
+<div class="sc-section">
+  <div class="sc-head">
+    <span class="sc-title">System Controls</span>
+    <span class="sc-badge">Admin</span>
+  </div>
+  <div class="sc-cards">
+    <div class="sc-card sc-card-orange">
+      <div class="sc-icon">🔄</div>
+      <div class="sc-card-body">
+        <div class="sc-card-title">Restart Frontend</div>
+        <div class="sc-card-desc">Closes the Gradio UI process. Docker automatically
+        brings it back in ~10 seconds. Refresh the page after restarting.</div>
+      </div>
+    </div>
+    <div class="sc-card sc-card-red">
+      <div class="sc-icon">⚠️</div>
+      <div class="sc-card-body">
+        <div class="sc-card-title">Reboot Raspberry Pi</div>
+        <div class="sc-card-desc">Powers off and restarts the entire device.
+        All services unavailable for ~60 seconds.
+        Use only if the station is completely unresponsive.</div>
+      </div>
+    </div>
+  </div>
+</div>
+"""
 
 
 def _build_test_card(test: dict) -> tuple[str, gr.Button, gr.HTML, gr.HTML]:
     with gr.Group(elem_classes=["test-card-v2"]):
-        with gr.Row(elem_classes=["tcv2-header-row"]):
-            header_html = gr.HTML(
-                value=test_header_html(test, "not_tested"),
-                elem_classes=["tcv2-header"],
-            )
-            button = gr.Button("▷ Test", size="sm", elem_classes=["tcv2-btn"])
+        header_html = gr.HTML(
+            value=test_header_html(test, "not_tested"),
+            elem_classes=["tcv2-header"],
+        )
         rows_html = gr.HTML(
             value=test_rows_html(test, "not_tested"),
             elem_classes=["tcv2-rows"],
         )
+        button = gr.Button("▷ Test", size="sm", elem_classes=["tcv2-btn"])
     return test["id"], button, header_html, rows_html
 
 
@@ -54,7 +80,7 @@ def build_debugging_page() -> DebuggingPage:
                 reset_button = gr.Button("Reset", size="md")
                 run_all_button = gr.Button("Run All", variant="primary", size="md")
 
-            for group_name, _accent, tests in TEST_GROUPS:
+            for group_name, accent, tests in TEST_GROUPS:
                 with gr.Accordion(
                     label=group_name,
                     open=(group_name == "Visual"),
@@ -75,6 +101,25 @@ def build_debugging_page() -> DebuggingPage:
                 elem_id="diag-summary-html",
             )
 
+    with gr.Accordion("System Events", open=False, elem_classes=["logs-accordion"]):
+        gr.HTML(value=system_events_html(), elem_classes=["log-table-container"])
+
+    gr.HTML(value=_system_controls_cards_html(), elem_id="sys-ctrl-cards")
+    with gr.Row(elem_id="sys-ctrl-btns"):
+        restart_frontend_btn = gr.Button(
+            "🔄 Restart Frontend",
+            variant="primary",
+            size="lg",
+            elem_id="btn-restart-frontend",
+        )
+        reboot_pi_btn = gr.Button(
+            "⚠️ Reboot Raspberry Pi",
+            variant="primary",
+            size="lg",
+            elem_id="btn-reboot-pi",
+        )
+    system_control_status = gr.HTML(value="", elem_id="sys-ctrl-status")
+
     return DebuggingPage(
         test_state=test_state,
         reset_button=reset_button,
@@ -84,4 +129,7 @@ def build_debugging_page() -> DebuggingPage:
         test_buttons=test_buttons,
         test_headers=test_headers,
         test_outputs=test_outputs,
+        restart_frontend_btn=restart_frontend_btn,
+        reboot_pi_btn=reboot_pi_btn,
+        system_control_status=system_control_status,
     )

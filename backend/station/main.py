@@ -8,9 +8,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import __version__
-from .api import cameras, detection, hardware, health, status
+from .api import cameras, detection, hardware, health, status, system
 from .api.deps import AppServices
 from .cameras.manager import CameraManager
+from .cameras.reader import CameraReader
 from .config import get_settings
 from .detection.registry import build_detector
 from .detection.service import DetectionService
@@ -27,7 +28,11 @@ async def lifespan(app: FastAPI):
     setup_logging(settings.log_level)
 
     hardware_mgr = HardwareManager(settings)
+    hardware_mgr.set_status_led(100, 40, 0)   # orange = starting up
+
     camera_mgr = CameraManager(settings)
+    camera_reader = CameraReader(camera_mgr, settings)
+    camera_reader.start()
     sink = DataApiSink(settings)
     sink.start()
     bundle = build_detector(settings)
@@ -45,10 +50,25 @@ async def lifespan(app: FastAPI):
         bundle.mode, " (degraded)" if bundle.degraded else "",
         hardware_mgr.mode, " (degraded)" if hardware_mgr.degraded else "",
     )
+    hardware_mgr.set_status_led(0, 100, 0)   # green = system ready
+    hardware_mgr.set_detection_feed_led(True)  # detection camera is active by default
+    error_parts = []
+    if hardware_mgr.degraded:
+        error_parts.append(hardware_mgr.note)
+    if camera_mgr.degraded:
+        error_parts.append("camera unavailable")
+    hardware_mgr.show_startup_lcd(
+        hw_ok=not hardware_mgr.degraded,
+        video_ok=not camera_mgr.degraded,
+        error="; ".join(error_parts),
+    )
+    hardware_mgr.startup_melody()
     try:
         yield
     finally:
+        hardware_mgr.set_status_led(0, 0, 0)  # off = shutting down
         detection_svc.stop()
+        camera_reader.stop()
         sink.close()
         camera_mgr.close_all()
         hardware_mgr.cleanup()
@@ -63,7 +83,7 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    for module in (health, status, detection, cameras, hardware):
+    for module in (health, status, detection, cameras, hardware, system):
         app.include_router(module.router)
     return app
 

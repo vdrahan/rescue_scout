@@ -56,7 +56,7 @@ PAGE_DETAILS = {
     "Data": {
         "icon": "DB",
         "title": "Data",
-        "subtitle": "Detection history, gas alerts, system events and statistics.",
+        "subtitle": "Detection history, gas alerts and statistics.",
     },
     "Statistics": {
         "icon": "CHT",
@@ -98,25 +98,26 @@ TEST_GROUPS = [
             {"id": "fpv_camera", "name": "FPV Camera", "accent": GREEN, "checks": [("RTSP Stream", "Connected"), ("Frame Rate", ">= 25 fps"), ("Latency", "< 200 ms")]},
             {"id": "detection_camera", "name": "Detection Camera", "accent": GREEN, "checks": [("RTSP Stream", "Connected"), ("Frame Rate", ">= 25 fps"), ("Resolution", "1280 x 720")]},
             {"id": "touchscreen", "name": "Touchscreen", "accent": PURPLE, "checks": [("Driver", "Loaded"), ("Touch Events", "Detected"), ("Response Time", "< 30 ms")]},
-            {"id": "lcd_display", "name": "LCD Display", "accent": BLUE, "checks": [("I2C Address", "0x27"), ("Response Time", "< 50 ms"), ("Screen Cycle", "4 pages")]},
+            {"id": "lcd_display", "name": "LCD Display", "accent": BLUE, "checks": [("I2C Address", "0x27"), ("Message", "HARDWARE TEST"), ("Backlight", "On")]},
         ],
     ),
     (
         "Sensors",
         PURPLE,
         [
-            {"id": "gas_sensor", "name": "Gas Sensor MQ-2", "accent": PURPLE, "checks": [("GPIO Signal", "1.5-3.3 V"), ("Current Reading", "< 250 ppm"), ("Response Time", "< 100 ms")]},
-            {"id": "temp_humidity", "name": "Temp & Humidity (DHT22)", "accent": BLUE, "checks": [("Temperature", "10-50 C"), ("Humidity", "20-90%"), ("Data Pin", "GPIO 4")]},
+            {"id": "gas_sensor", "name": "Gas Sensor MQ-2", "accent": PURPLE, "checks": [("ADC", "ADS1115 A0"), ("Current Reading", "< 250 ppm"), ("I2C Address", "0x48")]},
+            {"id": "temp_humidity", "name": "Temp & Humidity (DHT11)", "accent": BLUE, "checks": [("Temperature", "10-50 C"), ("Humidity", "20-90%"), ("Data Pin", "GPIO 25")]},
         ],
     ),
     (
         "Actuators",
         YELLOW,
         [
-            {"id": "detection_led", "name": "Detection LED", "accent": RED, "checks": [("GPIO Pin", "GPIO 17"), ("State Change", "ON/OFF"), ("Response Time", "< 20 ms")]},
-            {"id": "buzzer", "name": "Buzzer", "accent": YELLOW, "checks": [("GPIO Pin", "GPIO 27"), ("Pulse Pattern", "3 beeps"), ("Volume", "Audible")]},
-            {"id": "system_led", "name": "System LED", "accent": GREEN, "checks": [("GPIO Pin", "GPIO 22"), ("Power State", "ON"), ("Brightness", "Stable")]},
-            {"id": "camera_servo", "name": "Camera Servo", "accent": BLUE, "checks": [("PWM Signal", "50 Hz"), ("Angle", "0-90 deg"), ("Jitter", "< 2 deg")]},
+            {"id": "detection_led", "name": "FPV Feed LED", "accent": RED, "checks": [("GPIO Pin", "GPIO 17"), ("State Change", "ON/OFF"), ("Response Time", "< 20 ms")]},
+            {"id": "buzzer", "name": "Buzzer", "accent": YELLOW, "checks": [("GPIO Pin", "GPIO 5"), ("Pulse Pattern", "3 beeps"), ("Volume", "Audible")]},
+            {"id": "system_led", "name": "Detection Feed LED", "accent": GREEN, "checks": [("GPIO Pin", "GPIO 23"), ("State Change", "ON/OFF"), ("Brightness", "Stable")]},
+            {"id": "rgb_module", "name": "RGB Module", "accent": PURPLE, "checks": [("GPIO Pins", "26 / 16 / 6"), ("Color Cycle", "R/G/B"), ("Mode", "Digital")]},
+            {"id": "rgb_status", "name": "System Status LED", "accent": BLUE, "checks": [("GPIO Pins", "22 / 24 / 27"), ("Color Cycle", "G/R/B/Y"), ("Mode", "PWM")]},
         ],
     ),
 ]
@@ -423,10 +424,35 @@ footer { display: none !important; }
 }
 
 /* 14. METRICS */
-.metric-label { color: var(--sar-text-muted); font-size: 12px; font-weight: 700; }
-.metric-value { margin: 3px 0; color: var(--sar-orange); font-size: 24px; font-weight: 800; line-height: 1; }
-.metric-note { color: var(--sar-text-muted); font-size: 12px; }
+.metric-label { color: var(--sar-text-muted); font-size: 13px; font-weight: 700; }
+.metric-value { margin: 3px 0; color: var(--sar-orange); font-size: 30px; font-weight: 800; line-height: 1; }
+.metric-note { color: var(--sar-text-muted); font-size: 13px; }
 .stat-number input, .stat-number textarea { font-weight: 800 !important; color: var(--sar-orange) !important; }
+
+/* KPI row — equal width AND equal height for all three cards */
+.kpi-row { flex-wrap: nowrap !important; align-items: stretch !important; }
+.kpi-row > .form { display: flex !important; flex: 1 1 0 !important; min-width: 0 !important; align-items: stretch !important; }
+.kpi-row .metric-card {
+  flex: 1 1 0 !important;
+  min-width: 0 !important;
+  width: 100% !important;
+  height: auto !important;
+  min-height: 90px !important;
+  align-self: stretch !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+}
+.kpi-row .metric-card > .form { width: 100% !important; height: 100% !important; }
+.kpi-row .metric-card .block,
+.kpi-row .metric-card .wrap,
+.kpi-row .metric-card .compact-md {
+  width: 100% !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
 
 /* 15. BADGES */
 .badge-row { display: flex; flex-wrap: wrap; gap: 5px; }
@@ -499,51 +525,79 @@ footer { display: none !important; }
   border-radius: 8px !important;
 }
 
-/* Confidence Threshold card — label + live value over a compact slider */
-.op-threshold-head {
-  display: flex !important;
-  align-items: baseline !important;
-  justify-content: space-between !important;
-  gap: 8px !important;
-}
-.op-threshold-value {
-  font-size: 16px !important;
-  font-weight: 800 !important;
-  color: var(--sar-orange) !important;
-  line-height: 1 !important;
-}
-/* Hide Gradio's built-in slider head (label + number box + reset);
-   the card's own head already shows "Confidence Threshold" and the live value.
-   The range input keeps its aria-label, so it stays screen-reader accessible. */
-.op-threshold .head { display: none !important; }
-
-/* Slider gray — exact class from Gradio Svelte template: slider_input_container.svelte-8epfm4 */
-#op-threshold-slider .slider_input_container,
-.op-threshold .slider_input_container {
+/* Confidence Threshold — custom range input, zero Gradio chrome */
+.op-threshold-cell .block,
+.op-threshold-cell .wrap,
+.op-threshold-cell .prose {
   background: transparent !important;
-  background-color: transparent !important;
-  border: 0 !important;
-  box-shadow: none !important;
-}
-/* Also strip .wrap and .tab-like-container backgrounds */
-#op-threshold-slider .wrap,
-#op-threshold-slider .tab-like-container,
-.op-threshold .wrap,
-.op-threshold .tab-like-container {
-  background: transparent !important;
-  background-color: transparent !important;
-  border: 0 !important;
-  box-shadow: none !important;
-}
-/* Strip the block-level padded wrapper */
-#op-threshold-slider,
-#op-threshold-slider.block,
-#op-threshold-slider.block.padded {
-  background: transparent !important;
-  background-color: transparent !important;
   border: 0 !important;
   box-shadow: none !important;
   padding: 0 !important;
+  margin: 0 !important;
+}
+.thr-card { width: 100%; }
+.thr-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 10px;
+}
+.thr-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--sar-text);
+}
+.thr-val {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--sar-orange);
+  line-height: 1;
+}
+.thr-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 4px;
+  background: linear-gradient(
+    to right,
+    var(--sar-orange) var(--p, 45%),
+    rgba(148,163,184,0.25) var(--p, 45%)
+  );
+  outline: none;
+  cursor: pointer;
+  display: block;
+}
+.thr-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  background: #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2.5px var(--sar-orange), 0 2px 6px rgba(0,0,0,0.2);
+  cursor: grab;
+  transition: box-shadow 0.15s;
+}
+.thr-range::-webkit-slider-thumb:hover { box-shadow: 0 0 0 3.5px var(--sar-orange), 0 2px 8px rgba(0,0,0,0.3); }
+.thr-range::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  background: #ffffff;
+  border-radius: 50%;
+  border: none;
+  box-shadow: 0 0 0 2.5px var(--sar-orange), 0 2px 6px rgba(0,0,0,0.2);
+  cursor: grab;
+}
+.thr-range::-moz-range-progress {
+  height: 4px;
+  background: var(--sar-orange);
+  border-radius: 4px;
+}
+.thr-range::-moz-range-track {
+  height: 4px;
+  background: rgba(148,163,184,0.25);
+  border-radius: 4px;
 }
 
 /* AI Detection — ON state: .op-ai-btn is on wrapper div, button.primary is the inner element */
@@ -594,12 +648,12 @@ button.op-cam-btn:hover { background: var(--sar-surface-soft) !important; border
 }
 .op-camera-status {
   margin-top: 6px;
-  min-height: 34px;
+  min-height: 40px;
   display: flex;
   align-items: center;
   border-radius: 8px;
-  padding: 6px 10px;
-  font-size: 13px;
+  padding: 8px 14px;
+  font-size: 15px;
   font-weight: 700;
   border: 1px solid var(--sar-border);
   background: var(--sar-surface-soft);
@@ -814,12 +868,9 @@ button.primary, .primary button {
   font-weight: 700 !important;
 }
 .logs-card .logs-export-col button:hover { background: var(--sar-orange-dark) !important; border-color: var(--sar-orange-dark) !important; }
-/* logs-nav-row: tabs column left, filter column right, top-aligned */
-.logs-nav-row { align-items: flex-start !important; gap: 8px !important; margin: 0 !important; }
-.logs-tabs-col.block,
-.logs-tabs-col { background: transparent !important; border: 0 !important; box-shadow: none !important; padding: 0 !important; min-height: 0 !important; }
-.logs-filter-col.block,
-.logs-filter-col { background: transparent !important; border: 0 !important; box-shadow: none !important; padding: 0 !important; min-height: 0 !important; padding-top: 6px !important; }
+/* Class filter — sits above accordion panels */
+.logs-filter-col-top.block,
+.logs-filter-col-top { background: transparent !important; border: 0 !important; box-shadow: none !important; padding: 2px 0 6px !important; min-height: 0 !important; }
 .logs-filter, .logs-filter > div, .logs-filter .block,
 .logs-filter .label-wrap, .logs-filter label {
   background: transparent !important;
@@ -837,15 +888,114 @@ button.primary, .primary button {
   border-radius: 8px !important;
 }
 .logs-filter input { border: 0 !important; }
-/* Strip Gradio's gray container around tabs + table */
-.logs-tabs, .logs-tabs > div, .logs-tabs .tabitem,
-.logs-tabs .tab-nav, .logs-card .compact-table, .logs-card .compact-table > div {
+/* Accordion panels for tables */
+.logs-accordion {
+  background: var(--sar-surface) !important;
+  border: 1px solid var(--sar-border) !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+  margin-bottom: 4px !important;
+}
+.logs-accordion .label-wrap,
+.logs-accordion button.label-wrap {
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  color: var(--sar-text) !important;
+  background: var(--sar-surface-soft) !important;
+  border-radius: 8px !important;
+  padding: 8px 12px !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+.logs-accordion .wrap-outer,
+.logs-accordion .wrap,
+.logs-accordion .gap {
+  background: var(--sar-surface) !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 8px 0 0 !important;
+}
+.logs-accordion .form,
+.logs-accordion .block.gradio-column {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+/* Strip Gradio's gray container around table */
+.logs-card .compact-table, .logs-card .compact-table > div {
   background: transparent !important;
   border: 0 !important;
   box-shadow: none !important;
 }
-.logs-tabs .tabitem { padding: 6px 0 0 !important; }
 .logs-card .compact-table table { border: 1px solid var(--sar-border) !important; border-radius: 8px !important; overflow: hidden !important; }
+
+/* HTML log tables (replaces gr.Dataframe to avoid Svelte 5 renderer freeze) */
+.log-table-container { background: transparent !important; border: 0 !important; box-shadow: none !important; padding: 0 !important; }
+.log-table-wrap { overflow-x: auto; width: 100%; }
+.log-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.log-table th { background: var(--sar-surface-soft); color: var(--sar-text); font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; padding: 6px 8px; border-bottom: 2px solid var(--sar-border); text-align: left; white-space: nowrap; }
+.log-table td { padding: 5px 8px; border-bottom: 1px solid var(--sar-border); color: var(--sar-text); vertical-align: middle; }
+.log-table tbody tr:last-child td { border-bottom: 0; }
+.log-table tbody tr:hover { background: var(--sar-surface-soft); }
+
+/* Warning banner — full-width, appears between header and page content */
+#gas-banner,
+#gas-banner.block,
+#gas-banner > .wrap {
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+.gas-warning-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 14px;
+  padding: 10px 14px;
+  background: #fff1f2;
+  border: 1.5px solid #fca5a5;
+  border-radius: 10px;
+  color: #991b1b;
+  font-size: 13px;
+  font-weight: 600;
+  animation: gas-pulse 1.5s ease-in-out infinite;
+}
+.gas-warning-icon { font-size: 20px; flex-shrink: 0; }
+.gas-warning-text strong { color: #7f1d1d; }
+@keyframes gas-pulse {
+  0%, 100% { border-color: #fca5a5; background: #fff1f2; }
+  50%       { border-color: #ef4444; background: #fee2e2; }
+}
+/* Area safe banner — green */
+.area-safe-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 14px;
+  padding: 8px 14px;
+  background: #f0fdf4;
+  border: 1.5px solid #86efac;
+  border-radius: 10px;
+  color: #166534;
+  font-size: 13px;
+  font-weight: 600;
+}
+.area-safe-banner .gas-warning-text strong { color: #14532d; }
+
+/* Temperature warning banner — amber/orange to distinguish from gas red */
+.temp-warning-banner {
+  background: #fffbeb !important;
+  border-color: #fcd34d !important;
+  color: #92400e !important;
+  animation: temp-pulse 1.5s ease-in-out infinite;
+}
+.temp-warning-banner .gas-warning-text strong { color: #78350f; }
+@keyframes temp-pulse {
+  0%, 100% { border-color: #fcd34d; background: #fffbeb; }
+  50%       { border-color: #f59e0b; background: #fef3c7; }
+}
 
 /* Export notice banner — temporary, compact, warning style */
 .export-banner-wrap { padding: 0 !important; background: transparent !important; border: 0 !important; }
@@ -950,6 +1100,14 @@ button.primary, .primary button {
   border-color: #fca5a5 !important;
 }
 
+/* Force vertical stacking inside test cards */
+.test-card-v2 > .form {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0 !important;
+  width: 100% !important;
+}
+
 /* Belt-and-suspenders: also zero out backgrounds explicitly */
 .test-card-v2 .form,
 .test-card-v2 .block,
@@ -964,15 +1122,15 @@ button.primary, .primary button {
   margin: 0 !important;
 }
 
-.tcv2-header-row {
-  gap: 8px !important;
-  align-items: center !important;
-  flex-wrap: nowrap !important;
+/* Button sits below the rows, full width */
+.tcv2-btn {
+  margin-top: 10px !important;
+  width: 100% !important;
+  order: 99 !important;
 }
-.tcv2-header { flex: 1 1 0 !important; min-width: 0 !important; }
-.tcv2-btn { flex: 0 0 auto !important; }
 .tcv2-btn button {
   background: #ffffff !important;
+  background-color: #ffffff !important;
   color: var(--sar-text-muted) !important;
   border: 1px solid #e5e7eb !important;
   border-radius: 6px !important;
@@ -981,6 +1139,7 @@ button.primary, .primary button {
   height: 28px !important;
   padding: 0 10px !important;
   box-shadow: none !important;
+  width: 100% !important;
 }
 
 /* 22. STATUS NOTICES */
@@ -1399,7 +1558,12 @@ button.primary, .primary button {
   .about-display-grid, .about-faq-grid { grid-template-columns: repeat(1, minmax(0, 1fr)); }
 }
 
-/* Diagnostic Summary — strip gr.HTML block wrapper, card is self-contained HTML */
+/* Diagnostic Summary — pin to top of its column and strip wrapper chrome */
+#diag-summary-col {
+  align-self: flex-start !important;
+  position: sticky;
+  top: 8px;
+}
 #diag-summary-html,
 #diag-summary-html.block,
 #diag-summary-html > .wrap,
@@ -1410,5 +1574,99 @@ button.primary, .primary button {
   box-shadow: none !important;
   padding: 0 !important;
   margin: 0 !important;
+}
+
+/* System Controls — strip Gradio grey from wrappers only (not buttons themselves) */
+#sys-ctrl-cards, #sys-ctrl-cards.block, #sys-ctrl-cards > .wrap,
+#sys-ctrl-btns, #sys-ctrl-btns.block, #sys-ctrl-btns > .form,
+#sys-ctrl-btns > .form > .block,
+#btn-restart-frontend.block, #btn-reboot-pi.block,
+#sys-ctrl-status, #sys-ctrl-status.block, #sys-ctrl-status > .wrap {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  --block-background-fill: transparent;
+  --block-border-color: transparent;
+  --block-border-width: 0px;
+}
+#sys-ctrl-btns { gap: 12px !important; margin-top: 4px !important; }
+#sys-ctrl-status { min-height: 0 !important; }
+
+/* Buttons — explicit orange colour so nothing can override */
+#btn-restart-frontend button,
+#btn-reboot-pi button {
+  background: var(--sar-orange) !important;
+  background-color: var(--sar-orange) !important;
+  border-color: var(--sar-orange-dark) !important;
+  color: #ffffff !important;
+  border-radius: 8px !important;
+  font-weight: 700 !important;
+}
+#btn-restart-frontend button:hover,
+#btn-reboot-pi button:hover {
+  background: var(--sar-orange-dark) !important;
+  background-color: var(--sar-orange-dark) !important;
+}
+
+/* System Controls card visuals */
+.sc-section { margin: 14px 0 0; }
+.sc-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.sc-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--sar-text);
+}
+.sc-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+.sc-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.sc-card {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  border-radius: 10px;
+  padding: 12px 14px;
+  border: 1px solid;
+}
+.sc-card-orange {
+  background: var(--sar-orange-soft);
+  border-color: var(--sar-orange-border);
+}
+.sc-card-red {
+  background: var(--sar-red-soft);
+  border-color: var(--sar-red-border);
+}
+.sc-icon { font-size: 20px; flex-shrink: 0; margin-top: 1px; }
+.sc-card-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--sar-text);
+  margin-bottom: 3px;
+}
+.sc-card-desc {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--sar-text-muted);
 }
 """

@@ -1,3 +1,9 @@
+"""Hardware test script.
+
+CLI mode  : direct GPIO access (run with station service STOPPED).
+Gradio mode: proxy to the station API (run with station service RUNNING).
+"""
+
 import argparse
 import time
 
@@ -5,15 +11,24 @@ try:
     import RPi.GPIO as GPIO
     import dht11
     import smbus
-except ImportError as exc:
-    raise RuntimeError(
-        "This hardware test script must run on Raspberry Pi with GPIO, dht11, and smbus installed."
-    ) from exc
+    HW_AVAILABLE = True
+except ImportError:
+    GPIO = None
+    dht11 = None
+    smbus = None
+    HW_AVAILABLE = False
 
 try:
     import gradio as gr
 except ImportError:
     gr = None
+
+try:
+    import requests as _requests
+except ImportError:
+    _requests = None
+
+STATION_API = "http://localhost:8001"
 
 BUZZER = 5
 RGB1_R = 26
@@ -40,13 +55,64 @@ bus = None
 sensor = None
 
 
+# ---------------------------------------------------------------------------
+# Station API proxy (used in Gradio mode)
+# ---------------------------------------------------------------------------
+
+def _api_test(component: str) -> str:
+    """Call the station hardware test API and return a human-readable result."""
+    if _requests is None:
+        return f"{component}: SKIP — 'requests' package not installed"
+    try:
+        r = _requests.post(f"{STATION_API}/api/hardware/test/{component}", timeout=30)
+        r.raise_for_status()
+        data = r.json()
+        status = data.get("status", "unknown").upper()
+        detail = data.get("detail", "")
+        return f"{component}: {status}" + (f" — {detail}" if detail else "")
+    except Exception as exc:
+        return f"{component}: ERROR — {exc}"
+
+
+def _api_status() -> str:
+    """Return a summary of the station hardware status."""
+    if _requests is None:
+        return "SKIP — 'requests' package not installed"
+    try:
+        r = _requests.get(f"{STATION_API}/api/hardware/status", timeout=10)
+        r.raise_for_status()
+        data = r.json()
+        mode = data.get("mode", "?")
+        degraded = data.get("degraded", False)
+        note = data.get("note", "")
+        gas = data.get("gas", {})
+        climate = data.get("climate", {})
+        lines = [
+            f"Station mode: {mode}" + (" (degraded)" if degraded else ""),
+        ]
+        if note:
+            lines.append(f"Note: {note}")
+        if gas.get("ppm") is not None:
+            lines.append(f"Gas: {gas['ppm']} ppm {'⚠ DANGEROUS' if gas.get('dangerous') else 'OK'}")
+        if climate.get("temperature") is not None:
+            lines.append(f"Climate: {climate['temperature']}°C / {climate['humidity']}%")
+        return "\n".join(lines)
+    except Exception as exc:
+        return f"Station API unavailable — {exc}"
+
+
+# ---------------------------------------------------------------------------
+# Direct GPIO helpers (CLI mode only — requires station service STOPPED)
+# ---------------------------------------------------------------------------
+
 def setup_hardware():
+    if not HW_AVAILABLE:
+        raise RuntimeError("RPi.GPIO / dht11 / smbus not installed in this environment")
     global red_pwm, green_pwm, blue_pwm, bus, sensor
     GPIO.setmode(GPIO.BCM)
     GPIO.setwarnings(False)
     for pin in PINS:
-        GPIO.setup(pin, GPIO.OUT)
-        GPIO.output(pin, GPIO.LOW)
+        GPIO.setup(pin, GPIO.OUT, initial=GPIO.LOW)
 
     bus = smbus.SMBus(1)
     sensor = dht11.DHT11(pin=DHT_PIN)
@@ -60,21 +126,20 @@ def setup_hardware():
 
 
 def cleanup_hardware():
+    if not HW_AVAILABLE:
+        return
     if red_pwm:
         red_pwm.stop()
     if green_pwm:
         green_pwm.stop()
     if blue_pwm:
         blue_pwm.stop()
-
     for pin in PINS:
         GPIO.output(pin, GPIO.LOW)
-
     try:
         lcd_clear()
     except Exception:
         pass
-
     GPIO.cleanup()
 
 
@@ -132,6 +197,10 @@ def lcd_text(text, line):
     for ch in text:
         lcd_write(ord(ch), 1)
 
+
+# ---------------------------------------------------------------------------
+# Direct GPIO tests (CLI mode)
+# ---------------------------------------------------------------------------
 
 def test_buzzer():
     print("Running buzzer test...")
@@ -198,96 +267,129 @@ def test_lcd():
 
 
 def run_all_tests():
-    results = []
-    results.append(test_buzzer())
-    results.append(test_leds())
-    results.append(test_rgb_module())
-    results.append(test_rgb_led())
-    results.append(test_dht11())
-    results.append(test_lcd())
+    results = [
+        test_buzzer(),
+        test_leds(),
+        test_rgb_module(),
+        test_rgb_led(),
+        test_dht11(),
+        test_lcd(),
+    ]
     return "\n".join(results)
+
+
+# ---------------------------------------------------------------------------
+# Gradio UI (proxies to station API — works while station service is running)
+# ---------------------------------------------------------------------------
+
+# Maps Gradio button label → station component id
+_COMPONENT_MAP = {
+    "Buzzer": "buzzer",
+    "Green LEDs": "system_led",
+    "RGB Module": "rgb_module",
+    "RGB PWM LED": "rgb_status",
+    "DHT11 / Climate": "temp_humidity",
+    "LCD": "lcd_display",
+    "Gas Sensor (MQ-2)": "gas_sensor",
+}
 
 
 def run_gradio():
     if gr is None:
-        raise RuntimeError("Install gradio to use this interface.")
+        raise RuntimeError("Install gradio to use this interface: pip install gradio")
 
-    def run_buzzer():
-        return test_buzzer()
-
-    def run_leds():
-        return test_leds()
-
-    def run_rgb_module():
-        return test_rgb_module()
-
-    def run_rgb_led():
-        return test_rgb_led()
-
-    def run_dht11():
-        return test_dht11()
-
-    def run_lcd():
-        return test_lcd()
-
-    def run_all():
-        return run_all_tests()
-
-    with gr.Blocks() as demo:
+    with gr.Blocks(title="Hardware Test Console") as demo:
         gr.Markdown("# Hardware Test Console")
-        output = gr.Textbox(label="Result", lines=10)
-        with gr.Row():
-            gr.Button("Buzzer").click(run_buzzer, outputs=output)
-            gr.Button("Green LEDs").click(run_leds, outputs=output)
-            gr.Button("RGB Module").click(run_rgb_module, outputs=output)
-        with gr.Row():
-            gr.Button("RGB PWM LED").click(run_rgb_led, outputs=output)
-            gr.Button("DHT11").click(run_dht11, outputs=output)
-            gr.Button("LCD").click(run_lcd, outputs=output)
-        gr.Button("Run All Tests").click(run_all, outputs=output)
-    demo.launch(server_name="0.0.0.0", server_port=7861)
+        gr.Markdown(
+            "Tests run via the **station API** (`localhost:8000`) — the station service must be running.\n\n"
+            "To run direct GPIO tests without the station, use `python test.py --interface cli` "
+            "(stop the station service first)."
+        )
 
+        with gr.Row():
+            status_btn = gr.Button("Get Hardware Status", variant="primary")
+
+        status_out = gr.Textbox(label="Hardware Status", lines=6, interactive=False)
+        status_btn.click(fn=_api_status, outputs=status_out)
+
+        gr.Markdown("---\n### Component Tests")
+        output = gr.Textbox(label="Test Result", lines=4, interactive=False)
+
+        with gr.Row():
+            for label in ("Buzzer", "Green LEDs", "RGB Module"):
+                component = _COMPONENT_MAP[label]
+                gr.Button(label).click(fn=lambda c=component: _api_test(c), outputs=output)
+
+        with gr.Row():
+            for label in ("RGB PWM LED", "DHT11 / Climate", "LCD", "Gas Sensor (MQ-2)"):
+                component = _COMPONENT_MAP[label]
+                gr.Button(label).click(fn=lambda c=component: _api_test(c), outputs=output)
+
+        def run_all_via_api():
+            results = [_api_test(c) for c in _COMPONENT_MAP.values()]
+            return "\n".join(results)
+
+        gr.Button("Run All Tests", variant="primary").click(fn=run_all_via_api, outputs=output)
+
+    demo.launch(server_name="0.0.0.0", server_port=7861, inbrowser=False)
+
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
 
 def main():
-    parser = argparse.ArgumentParser(description="Simple hardware test script")
-    parser.add_argument("--interface", choices=["cli", "gradio"], default="cli")
+    parser = argparse.ArgumentParser(description="Hardware test script")
+    parser.add_argument("--interface", choices=["cli", "gradio"], default="gradio")
     args = parser.parse_args()
 
-    setup_hardware()
+    if args.interface == "gradio":
+        run_gradio()
+        return
+
+    # CLI mode: direct GPIO (station service must be stopped)
+    if not HW_AVAILABLE:
+        print("ERROR: RPi.GPIO / dht11 / smbus not installed. Cannot run CLI hardware tests.")
+        return
+
     try:
-        if args.interface == "gradio":
-            run_gradio()
-        else:
-            lcd_init()
-            while True:
-                print("\nHardware Test Menu")
-                print("1 - Buzzer")
-                print("2 - Green LEDs")
-                print("3 - RGB Module")
-                print("4 - RGB PWM LED")
-                print("5 - DHT11")
-                print("6 - LCD")
-                print("7 - Run All Tests")
-                print("0 - Exit")
-                choice = input("Choose: ")
-                if choice == "1":
-                    print(test_buzzer())
-                elif choice == "2":
-                    print(test_leds())
-                elif choice == "3":
-                    print(test_rgb_module())
-                elif choice == "4":
-                    print(test_rgb_led())
-                elif choice == "5":
-                    print(test_dht11())
-                elif choice == "6":
-                    print(test_lcd())
-                elif choice == "7":
-                    print(run_all_tests())
-                elif choice == "0":
-                    break
-                else:
-                    print("Wrong choice")
+        setup_hardware()
+    except Exception as exc:
+        print(f"ERROR: Hardware setup failed: {exc}")
+        print("Hint: stop the station service before running direct GPIO tests.")
+        return
+
+    try:
+        lcd_init()
+        while True:
+            print("\nHardware Test Menu")
+            print("1 - Buzzer")
+            print("2 - Green LEDs")
+            print("3 - RGB Module")
+            print("4 - RGB PWM LED")
+            print("5 - DHT11")
+            print("6 - LCD")
+            print("7 - Run All Tests")
+            print("0 - Exit")
+            choice = input("Choose: ")
+            if choice == "1":
+                print(test_buzzer())
+            elif choice == "2":
+                print(test_leds())
+            elif choice == "3":
+                print(test_rgb_module())
+            elif choice == "4":
+                print(test_rgb_led())
+            elif choice == "5":
+                print(test_dht11())
+            elif choice == "6":
+                print(test_lcd())
+            elif choice == "7":
+                print(run_all_tests())
+            elif choice == "0":
+                break
+            else:
+                print("Wrong choice")
     except KeyboardInterrupt:
         print("Stopped by user")
     finally:

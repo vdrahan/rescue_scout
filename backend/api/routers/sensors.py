@@ -32,6 +32,14 @@ def list_readings(
     return repo.get_readings(sensor_id, sensor_name, dangerous_only, limit, from_time, to_time)
 
 
+@router.get("/sensor-readings/count")
+def count_readings(
+    sensor_name: str | None = Query(default=None),
+    dangerous_only: bool = Query(default=False),
+) -> dict[str, int]:
+    return {"count": repo.count_readings(sensor_name, dangerous_only)}
+
+
 @router.get("/sensor-readings/recent")
 def recent_readings(limit: int = Query(default=20, ge=1, le=100)) -> list[dict[str, Any]]:
     return repo.get_recent_readings(limit)

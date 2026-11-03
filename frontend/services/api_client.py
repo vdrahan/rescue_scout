@@ -10,11 +10,12 @@ import io
 import logging
 import time
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from typing import Any
 
 import httpx
 
-from .config import API_URL, BACKEND_COOLDOWN_SECONDS, REQUEST_TIMEOUT, STATION_URL
+from .config import API_URL, BACKEND_COOLDOWN_SECONDS, HARDWARE_TEST_TIMEOUT, REQUEST_TIMEOUT, STATION_URL
 
 log = logging.getLogger(__name__)
 
@@ -162,7 +163,21 @@ def hardware_status() -> dict | None:
 
 
 def test_component(component: str) -> dict | None:
-    return _json("station", _station, "POST", f"/api/hardware/test/{component}")
+    return _json(
+        "station",
+        _station,
+        "POST",
+        f"/api/hardware/test/{component}",
+        timeout=HARDWARE_TEST_TIMEOUT,
+    )
+
+
+def cycle_lcd_screen() -> dict | None:
+    return _json("station", _station, "POST", "/api/hardware/lcd/cycle")
+
+
+def reboot_pi() -> dict | None:
+    return _json("station", _station, "POST", "/api/system/reboot")
 
 
 # ---------------------------------------------------------------------------
@@ -191,18 +206,31 @@ def sensor_readings(sensor_name: str | None = None, dangerous_only: bool = False
     return _json("api", _api, "GET", "/sensor-readings", params=params)
 
 
+def sensor_readings_count(sensor_name: str | None = None, dangerous_only: bool = False) -> int | None:
+    params: dict[str, Any] = {"dangerous_only": dangerous_only}
+    if sensor_name:
+        params["sensor_name"] = sensor_name
+    result = _json("api", _api, "GET", "/sensor-readings/count", params=params)
+    if result is None:
+        return None
+    return result.get("count")
+
+
 def events(limit: int = 50) -> list[dict] | None:
     return _json("api", _api, "GET", "/events", params={"limit": limit})
 
 
-def stat_detections_over_time(bucket: str = "minute") -> list[dict] | None:
-    return _json("api", _api, "GET", "/statistics/detections-over-time", params={"bucket": bucket})
+def stat_detections_over_time(bucket: str = "minute", hours: int = 2) -> list[dict] | None:
+    from_time = (datetime.now() - timedelta(hours=hours)).isoformat()
+    return _json("api", _api, "GET", "/statistics/detections-over-time",
+                 params={"bucket": bucket, "from_time": from_time})
 
 
 def stat_class_distribution() -> list[dict] | None:
     return _json("api", _api, "GET", "/statistics/class-distribution")
 
 
-def stat_sensor_over_time(sensor_name: str = "gas", bucket: str = "minute") -> list[dict] | None:
+def stat_sensor_over_time(sensor_name: str = "gas", bucket: str = "minute", hours: int = 2) -> list[dict] | None:
+    from_time = (datetime.now() - timedelta(hours=hours)).isoformat()
     return _json("api", _api, "GET", "/statistics/sensor-over-time",
-                 params={"sensor_name": sensor_name, "bucket": bucket})
+                 params={"sensor_name": sensor_name, "bucket": bucket, "from_time": from_time})

@@ -206,4 +206,5 @@ def launch_dashboard(ctx: AppContext, demo: gr.Blocks) -> None:
         server_name=ctx.cfg.gradio_host,
         server_port=ctx.cfg.gradio_port,
         show_error=True,
+        inbrowser=False,
     )

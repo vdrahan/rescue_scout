@@ -4,101 +4,90 @@ from dataclasses import dataclass
 
 import gradio as gr
 
-from ..constants import (
-    DETECTION_HEADERS,
-    GAS_ALERT_HEADERS,
-    SYSTEM_EVENT_HEADERS,
-)
 from ..handlers import (
     CANONICAL_CLASS_CHOICES,
     class_distribution_figure,
     data_kpi_cards,
-    filter_detection_events,
-    gas_alert_rows,
+    gas_kpi_card_html,
+    detection_events_html,
+    gas_alerts_html,
     gas_history_figure,
     metric_html,
-    system_event_rows,
 )
 
 
 @dataclass
 class DataLogsPage:
+    gas_kpi: gr.HTML
+    gas_history_plot: gr.Plot
+    class_dist_plot: gr.Plot
     class_filter: gr.Dropdown
-    detection_table: gr.Dataframe
-    export_button: gr.Button
-    export_file: gr.File
-    export_banner: gr.HTML
+    detection_export_button: gr.Button
+    detection_export_file: gr.File
+    detection_table: gr.HTML
+    gas_export_button: gr.Button
+    gas_export_file: gr.File
+    gas_table: gr.HTML
 
 
 def build_data_logs_page() -> DataLogsPage:
+    cards = data_kpi_cards()
     with gr.Row(elem_classes=["kpi-row"]):
-        for label, value, note, color in data_kpi_cards():
-            with gr.Column(elem_classes=["metric-card"], min_width=150):
+        # First 2 cards are static (don't change second-to-second)
+        for label, value, note, color in cards:
+            with gr.Column(elem_classes=["metric-card"], scale=1, min_width=200):
                 gr.Markdown(metric_html(label, value, note, color), elem_classes=["compact-md"])
+        # Gas Alerts card is a tracked gr.HTML so the timer can update it
+        with gr.Column(elem_classes=["metric-card"], scale=1, min_width=200):
+            gas_kpi = gr.HTML(value=gas_kpi_card_html(), elem_classes=["compact-md"])
 
     with gr.Row(elem_classes=["data-chart-row"]):
         with gr.Column(scale=1, min_width=300, elem_classes=["app-card", "plot-cell"]):
-            gr.Plot(value=gas_history_figure(), show_label=False, elem_classes=["plot-card"])
+            gas_history_plot = gr.Plot(value=gas_history_figure(), show_label=False, elem_classes=["plot-card"])
         with gr.Column(scale=1, min_width=300, elem_classes=["app-card", "plot-cell"]):
-            gr.Plot(value=class_distribution_figure(), show_label=False, elem_classes=["plot-card"])
+            class_dist_plot = gr.Plot(value=class_distribution_figure(), show_label=False, elem_classes=["plot-card"])
 
     with gr.Group(elem_classes=["app-card", "logs-card"]):
-        export_banner = gr.HTML(value="", visible=False, elem_classes=["export-banner-wrap"])
-        export_file = gr.File(
-            value=None,
-            label='CSV export',
-            interactive=False,
-            visible=False,
-        )
-
         with gr.Row(elem_classes=["logs-header"]):
             gr.HTML(
-                "<div class='logs-title'><span class='logs-title-main'>Stored Logs</span>"
-                "<span class='logs-title-sub'>Detection, system, and gas alert history</span></div>"
+                "<div class='logs-title'><span class='logs-title-main'>Data</span>"
+                "<span class='logs-title-sub'>Detection and gas alert history</span></div>"
             )
-            with gr.Column(scale=0, min_width=140, elem_classes=["logs-export-col"]):
-                export_button = gr.Button("Export CSV", variant="primary", size="md")
 
-        with gr.Row(elem_classes=["logs-nav-row"]):
-            with gr.Column(scale=1, elem_classes=["logs-tabs-col"]):
-                with gr.Tabs(elem_classes=["logs-tabs"]):
-                    with gr.TabItem("Detection Events"):
-                        detection_table = gr.Dataframe(
-                            value=filter_detection_events("All classes"),
-                            headers=DETECTION_HEADERS,
-                            interactive=False,
-                            row_count=7,
-                            column_count=6,
-                            elem_classes=["compact-table"],
-                        )
-                    with gr.TabItem("System Events"):
-                        gr.Dataframe(
-                            value=system_event_rows(),
-                            headers=SYSTEM_EVENT_HEADERS,
-                            interactive=False,
-                            row_count=6,
-                            column_count=4,
-                            elem_classes=["compact-table"],
-                        )
-                    with gr.TabItem("Gas Alerts"):
-                        gr.Dataframe(
-                            value=gas_alert_rows(),
-                            headers=GAS_ALERT_HEADERS,
-                            interactive=False,
-                            row_count=4,
-                            column_count=4,
-                            elem_classes=["compact-table"],
-                        )
-            with gr.Column(scale=0, min_width=220, elem_classes=["logs-filter-col"]):
-                class_filter = gr.Dropdown(
-                    CANONICAL_CLASS_CHOICES, value="All classes", label="Class filter",
-                    elem_classes=["logs-filter"],
-                )
+        with gr.Accordion("🎯 Detection Events", open=True, elem_classes=["logs-accordion"]):
+            with gr.Row(elem_classes=["logs-filter-row"]):
+                with gr.Column(scale=1):
+                    class_filter = gr.Dropdown(
+                        CANONICAL_CLASS_CHOICES, value="All classes", label="Class filter",
+                        elem_classes=["logs-filter"],
+                    )
+                with gr.Column(scale=0, min_width=140, elem_classes=["logs-export-col"]):
+                    detection_export_button = gr.Button("Export CSV", variant="primary", size="md")
+            detection_export_file = gr.File(visible=False, label="Download")
+            detection_table = gr.HTML(
+                value=detection_events_html("All classes"),
+                elem_classes=["log-table-container"],
+            )
+
+        with gr.Accordion("☢️ Gas Alerts", open=True, elem_classes=["logs-accordion"]):
+            with gr.Row(elem_classes=["logs-filter-row"]):
+                with gr.Column(scale=0, min_width=140, elem_classes=["logs-export-col"]):
+                    gas_export_button = gr.Button("Export CSV", variant="primary", size="md")
+            gas_export_file = gr.File(visible=False, label="Download")
+            gas_table = gr.HTML(
+                value=gas_alerts_html(),
+                elem_classes=["log-table-container"],
+            )
 
     return DataLogsPage(
+        gas_kpi=gas_kpi,
+        gas_history_plot=gas_history_plot,
+        class_dist_plot=class_dist_plot,
         class_filter=class_filter,
+        detection_export_button=detection_export_button,
+        detection_export_file=detection_export_file,
         detection_table=detection_table,
-        export_button=export_button,
-        export_file=export_file,
-        export_banner=export_banner,
+        gas_export_button=gas_export_button,
+        gas_export_file=gas_export_file,
+        gas_table=gas_table,
     )

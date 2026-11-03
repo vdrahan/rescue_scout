@@ -1,36 +1,32 @@
-# Raspberry Pi 5 override — real detection + real hardware.
-#
-#   docker compose -f compose.yaml -f compose.pi.yaml up -d --build
-#
-# Builds the station "full" image (torch + OpenCV + Pi hardware libs) and grants
-# access to GPIO / I2C / camera devices WITHOUT privileged mode.
 services:
   station:
+    # Real GPIO/I2C access on Raspberry Pi needs device permissions inside the
+    # container. The base image runs as appuser for laptop/mock mode, but the Pi
+    # hardware profile must be able to drive /dev/gpiochip0 directly.
+    user: "0:0"
+    privileged: true
     build:
       args:
         STATION_PROFILE: full
     environment:
       DETECTION_MODE: real
       HARDWARE_MODE: real
-      MODEL_PATH: /models/best.pt          # mounted below (your trained YOLOv26)
+      GPIO_CHIP: ${GPIO_CHIP:-0}
+      MODEL_PATH: /models/best.pt
       RTSP_CAMERA_1_URL: ${RTSP_CAMERA_1_URL:-}
       RTSP_CAMERA_2_URL: ${RTSP_CAMERA_2_URL:-}
       CONF_THRESHOLD: ${CONF_THRESHOLD:-0.45}
-      TARGET_FPS: ${TARGET_FPS:-8}
-      IMG_SIZE: ${IMG_SIZE:-320}
+      TARGET_FPS: ${TARGET_FPS:-4}
+      IMG_SIZE: ${IMG_SIZE:-160}
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
     devices:
-      # Pi 5: the 40-pin header is exposed by the RP1 chip. gpiochip0 works for
-      # most setups; if your pins are on gpiochip4, map that line instead/too.
       - "/dev/gpiochip0:/dev/gpiochip0"
-      # - "/dev/gpiochip4:/dev/gpiochip4"
-      - "/dev/i2c-1:/dev/i2c-1"            # ADS1115 (MQ-2) + LCD
-      # USB camera only — RTSP cameras are network, no device needed.
-      # Uncomment ONLY when a USB camera is plugged in (the node must exist):
-      #   ls /dev/video*   ->   then add the matching line below.
-      # - "/dev/video0:/dev/video0"
-    # The container user must belong to these groups to use the devices. The
-    # GIDs must match the host's gpio/i2c/video groups (Raspberry Pi OS defaults
-    # usually work; adjust if your /dev nodes use different group ids).
+      - "/dev/i2c-1:/dev/i2c-1"           
     volumes:
       # Drop your trained weights at ${MODEL_DIR}/best.pt on the host.
       - ${MODEL_DIR:-./backend/model/weights}:/models:ro
+
+  frontend: {}

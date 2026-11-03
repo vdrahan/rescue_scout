@@ -41,9 +41,9 @@ class Settings(BaseSettings):
     model_path: str = "model/best.pt"  # trained YOLOv26 weights
     conf_threshold: float = 0.45
     iou_threshold: float = 0.45
-    target_fps: float = 8.0
-    img_size: int = 320
-    frame_skip: int = 0  # extra frames to drop between inferences (0 = none)
+    target_fps: float = 4.0
+    img_size: int = 224
+    frame_skip: int = 1  # extra frames to drop between inferences (0 = none)
     max_detections: int = 20
 
     # --- Cameras ---
@@ -52,25 +52,33 @@ class Settings(BaseSettings):
     usb_camera_index: int = 0
     frame_width: int = 640
     frame_height: int = 480
+    camera_read_fps: float = 30.0  # upper bound for the CameraReader capture loop (self-paces to the camera's FPS)
+    # Live preview feed (FPV / non-AI) is tuned for MINIMUM latency, not quality:
+    # decimate to this width and encode at this JPEG quality before sending. Small
+    # frames encode in a few ms and transfer/render almost instantly. Set width 0
+    # for native resolution; lower both for even less latency.
+    camera_stream_max_width: int = 640
+    camera_stream_quality: int = 50
 
     # --- Hardware pins (BCM) — defaults from tests/test.py wiring ---
+    gpio_chip: int = 0
     buzzer_pin: int = 5
     system_led_pin: int = 23     # LED1
     detection_led_pin: int = 17  # LED2
-    rgb1_r_pin: int = 26
+    rgb1_r_pin: int = 6
     rgb1_g_pin: int = 16
-    rgb1_b_pin: int = 6
-    rgb2_r_pin: int = 22
-    rgb2_g_pin: int = 24
-    rgb2_b_pin: int = 27
+    rgb1_b_pin: int = 26
+    rgb2_r_pin: int = 27
+    rgb2_g_pin: int = 22
+    rgb2_b_pin: int = 24
     button_page_pin: int = 20
     button_camera_pin: int = 21
     dht_pin: int = 25
 
     # I2C
-    ads1115_i2c_addr: int = 0x48
+    ads1115_i2c_addr: int = 0x4b
     mq2_channel: int = 0
-    gas_danger_ppm: float = 250.0
+    gas_danger_ppm: float = 200.0
     lcd_i2c_addr: int = 0x27
     lcd_i2c_bus: int = 1
 

@@ -148,7 +148,7 @@ This is the feedback on my questions.
 - Feedback 1: Only minor adjustments to the line colors are needed. Once this is done, the nameplate can be approved for laser cutting, it has a GO.
 
 
-## MVP2 (Date: 09/06/2026)
+    +## MVP2 (Date: 09/06/2026)
 
 Lecturer: Claudia EECKHOUT, Pieter-Jan BEECKMAN, Paula ACUÑA RONCANCIO
 
@@ -203,3 +203,27 @@ From the ADC, the connections should be made as follows:
 - SDA connects to the Raspberry Pi SDA pin.
 - SCL connects to the Raspberry Pi SCL pin.
 - GND connects to the GND of the MQ-2 sensor and then to a GND pin on the Raspberry Pi.
+
+## MVP3 (Date: 09/06/2026)
+
+Lecturers: Geert DESLOOVERE, Thomas Huyghebaert, Stijn Walcarius
+
+* **Techconnect template**
+    
+    The TechConnect template needs to be corrected because it currently contains five pages, while the requirement is to submit only one page.
+
+
+
+## Conversation 7 (Date: 04/06/2026)
+
+Lecturer: Mаrie DEWITTE
+
+Questions for this conversation:
+
+- Question 1: How to better the performance of the model ?
+
+This is the feedback on my questions.
+
+- Feedback 1: To connect the MQ-2 sensor to the Raspberry Pi, an ADC converter is required because the Raspberry Pi cannot read analog signals directly.
+
+

@@ -56,6 +56,14 @@ class DetectionService:
         self._last_detection: dict | None = None
         self._debounce: dict[str, float] = {}
         self._last_gas_check = 0.0
+        self._gas_was_dangerous = False  # tracks previous state for edge detection
+        self._temp_was_high = False
+        self._last_temp_check = 0.0
+
+        # Start gas polling thread immediately (independent of detection)
+        self._gas_stop = threading.Event()
+        self._gas_thread = threading.Thread(target=self._gas_loop, name="gas-poll", daemon=True)
+        self._gas_thread.start()
 
     # -- control ------------------------------------------------------------
     def start(self) -> bool:
@@ -65,11 +73,16 @@ class DetectionService:
         self._started_at = time.time()
         self._thread = threading.Thread(target=self._loop, name="detection", daemon=True)
         self._thread.start()
+        if self._gas_stop.is_set():
+            self._gas_stop = threading.Event()
+            self._gas_thread = threading.Thread(target=self._gas_loop, name="gas-poll", daemon=True)
+            self._gas_thread.start()
         self._sink.record_event("detection_started", "INFO", f"mode={self.mode}")
         log.info("Detection started (mode=%s)", self.mode)
         return True
 
     def stop(self) -> bool:
+        self._gas_stop.set()
         if not self._running.is_set():
             return False
         self._running.clear()
@@ -95,7 +108,7 @@ class DetectionService:
         frame_no = 0
         while self._running.is_set():
             loop_start = time.time()
-            frame = self._cameras.read_active()
+            frame = self._cameras.read_inference()
             if frame is None:
                 time.sleep(0.1)
                 continue
@@ -159,20 +172,60 @@ class DetectionService:
                 self._counts[det.class_name] += 1
                 self._last_detection = entry
             self._sink.record_detection(det.class_name, det.confidence)
-            if det.priority == "HIGH" and not alerted:
-                self._hw.alert()
+            self._hw.blink_rgb_module_red(3.0)
+            self._hw.show_detection_on_lcd(det.class_name, entry["time"])
+            if not alerted:
+                self._hw.priority_alert(det.priority)
                 alerted = True
 
+    def _gas_loop(self) -> None:
+        """Background thread: read MQ-2 every 2 s and temperature every 10 s."""
+        while not self._gas_stop.is_set():
+            self._gas_stop.wait(timeout=2.0)
+            if self._gas_stop.is_set():
+                break
+            try:
+                reading = self._hw.read_gas()
+                if reading.get("ppm") is None:
+                    continue
+                self._sink.record_gas(reading["ppm"], reading["dangerous"])
+                now_dangerous = reading["dangerous"]
+                if now_dangerous and not self._gas_was_dangerous:
+                    threading.Thread(
+                        target=self._hw.gas_alert,
+                        args=(reading["ppm"],),
+                        name="gas-buzz",
+                        daemon=True,
+                    ).start()
+                self._gas_was_dangerous = now_dangerous
+            except Exception as exc:  # noqa: BLE001
+                log.warning("gas poll error: %s", exc)
+
+            # Temperature check every 10 s
+            now = time.time()
+            if now - self._last_temp_check < 5.0:
+                continue
+            self._last_temp_check = now
+            try:
+                climate = self._hw.read_climate()
+                temp = climate.get("temperature")
+                if temp is None:
+                    continue
+                now_high = float(temp) > 50.0
+                self._sink.record_temperature(float(temp), now_high)
+                if now_high and not self._temp_was_high:
+                    threading.Thread(
+                        target=self._hw.temp_alert,
+                        args=(float(temp),),
+                        name="temp-buzz",
+                        daemon=True,
+                    ).start()
+                self._temp_was_high = now_high
+            except Exception as exc:  # noqa: BLE001
+                log.warning("temp poll error: %s", exc)
+
     def _poll_gas(self) -> None:
-        now = time.time()
-        if now - self._last_gas_check < 3.0:
-            return
-        self._last_gas_check = now
-        reading = self._hw.read_gas()
-        if reading.get("ppm") is None:
-            return
-        if reading["dangerous"]:
-            self._sink.record_gas(reading["ppm"], True)
+        pass  # gas polling moved to dedicated _gas_loop thread
 
     # -- queries ------------------------------------------------------------
     def get_config(self) -> dict:
@@ -218,8 +271,8 @@ class DetectionService:
                 with self._lock:
                     self._jpeg_cache = (seq, data)
                 return data
-        # Stopped (or no frame yet) — give a live, un-annotated camera preview.
-        preview = self._cameras.read_active()
+        # Stopped (or no frame yet) — serve whatever the CameraReader last cached.
+        preview = self._cameras.cached()
         if preview is not None:
             return to_jpeg(preview)
         return to_jpeg(placeholder(self._settings.frame_width,

@@ -1,8 +1,6 @@
 # Raspberry Pi 5 hardware libraries. Installed only for the "full" profile and
-# only meaningful on a Pi (gpiozero uses the lgpio backend on Pi 5).
-gpiozero==2.0.1
+# only meaningful on a Pi. Uses lgpio/smbus2/dht11 directly (no adafruit-blinka).
 lgpio==0.2.2.0
-adafruit-blinka==8.51.0
-adafruit-circuitpython-ads1x15==2.4.1
-adafruit-circuitpython-dht==4.0.7
+rpi-lgpio==0.6
 smbus2==0.5.0
+dht11==0.1.0

@@ -37,11 +37,11 @@ def create_status(
             cur.execute(
                 """
                 INSERT INTO system_status
-                    (ai_status, front_camera_status, detection_camera_status, processing_status)
-                VALUES (%s, %s, %s, %s)
+                    (ai_status, front_camera_status, detection_camera_status, processing_status, saved_at)
+                VALUES (%s, %s, %s, %s, %s)
                 RETURNING status_id, saved_at;
                 """,
-                (ai_status, front_camera_status, detection_camera_status, processing_status),
+                (ai_status, front_camera_status, detection_camera_status, processing_status, datetime.now()),
             )
             row = cur.fetchone()
         conn.commit()
@@ -140,11 +140,11 @@ def create_event(
             cur.execute(
                 """
                 INSERT INTO event_log
-                    (event_type, importance_level, message, detection_id, status_id, reading_id)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                    (event_type, importance_level, message, detection_id, status_id, reading_id, event_time)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
                 RETURNING event_id, event_time;
                 """,
-                (event_type, importance_level, message, detection_id, status_id, reading_id),
+                (event_type, importance_level, message, detection_id, status_id, reading_id, datetime.now()),
             )
             row = cur.fetchone()
         conn.commit()

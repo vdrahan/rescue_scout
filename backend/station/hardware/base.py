@@ -52,6 +52,13 @@ class RgbLed(Device):
     def set_color(self, r: float, g: float, b: float) -> None: ...
 
 
+class RgbModule(Device):
+    kind = "rgb_module"
+
+    @abc.abstractmethod
+    def set_channel(self, channel: str | None) -> None: ...
+
+
 class Buzzer(Device):
     kind = "buzzer"
 

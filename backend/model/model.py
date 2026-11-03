@@ -1,5 +1,6 @@
 from pathlib import Path
 import os
+import socket
 
 os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;udp|max_delay;0|fflags;nobuffer|flags;low_delay"
 
@@ -256,9 +257,26 @@ def main():
     iface.launch(
         theme=gr.themes.Monochrome(),
         server_name=os.getenv("GRADIO_SERVER_NAME", "127.0.0.1"),
-        server_port=int(os.getenv("GRADIO_SERVER_PORT", "7860")),
+        server_port=find_free_port(),
+        inbrowser=False,
     )
 
+def find_free_port(default_port=7860):
+    port = int(os.getenv("GRADIO_SERVER_PORT", default_port))
+    host = os.getenv("GRADIO_SERVER_NAME", "127.0.0.1")
 
+    for candidate in range(port, port + 10):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            try:
+                sock.bind((host, candidate))
+                return candidate
+            except OSError:
+                continue
+    raise OSError(f"Cannot find empty port in range: {port}-{port + 9}")
+
+    
+    
+    
 if __name__ == "__main__":
     main()

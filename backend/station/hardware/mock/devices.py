@@ -5,7 +5,7 @@ from __future__ import annotations
 import random
 
 from ...logging_conf import get_logger
-from ..base import Button, Buzzer, ClimateSensor, GasSensor, Lcd, Led, RgbLed
+from ..base import Buzzer, Button, ClimateSensor, GasSensor, Lcd, Led, RgbLed, RgbModule
 
 log = get_logger(__name__)
 
@@ -45,9 +45,29 @@ class MockRgbLed(RgbLed):
         return self._color
 
     def test(self) -> tuple[bool, str]:
-        self.set_color(0, 100, 0)
+        for color in ((0, 100, 0), (100, 0, 0), (0, 0, 100), (100, 100, 0)):
+            self.set_color(*color)
         self.set_color(0, 0, 0)
-        return True, "mock RGB cycled"
+        return True, "mock RGB PWM LED cycled"
+
+
+class MockRgbModule(RgbModule):
+    def __init__(self, dev_id: str, name: str):
+        super().__init__(dev_id, name)
+        self._channel: str | None = None
+
+    def set_channel(self, channel: str | None) -> None:
+        self._channel = channel
+        log.debug("[mock] RGB module %s -> %s", self.id, channel or "off")
+
+    def value(self):
+        return self._channel or "off"
+
+    def test(self) -> tuple[bool, str]:
+        for channel in ("red", "green", "blue"):
+            self.set_channel(channel)
+        self.set_channel(None)
+        return True, "mock RGB module cycled"
 
 
 class MockBuzzer(Buzzer):
@@ -56,7 +76,7 @@ class MockBuzzer(Buzzer):
 
     def test(self) -> tuple[bool, str]:
         self.beep(3)
-        return True, "mock buzzer pulsed 3x"
+        return True, "mock buzzer pulsed reference pattern"
 
 
 class MockGasSensor(GasSensor):

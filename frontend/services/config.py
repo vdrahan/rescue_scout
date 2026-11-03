@@ -11,6 +11,9 @@ API_URL = os.getenv("API_URL", "http://localhost:8000").rstrip("/")
 # Keep HTTP calls snappy so the Gradio UI never blocks on a slow/absent backend.
 REQUEST_TIMEOUT = float(os.getenv("FRONTEND_HTTP_TIMEOUT", "2.5"))
 
+# Some physical self-tests intentionally blink/beep/read for a few seconds.
+HARDWARE_TEST_TIMEOUT = float(os.getenv("FRONTEND_HARDWARE_TEST_TIMEOUT", "8.0"))
+
 # After a failed call, skip that backend for this long (circuit breaker).
 BACKEND_COOLDOWN_SECONDS = float(os.getenv("FRONTEND_BACKEND_COOLDOWN", "5.0"))
 

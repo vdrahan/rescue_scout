@@ -7,6 +7,7 @@ import gradio as gr
 from .constants import APP_TITLE, DEFAULT_PAGE, PAGE_DETAILS, PAGE_KEYS, PAGE_UI_LABELS
 from .handlers import (
     current_clock,
+    gas_banner_html,
     header_icon_html,
     logo_html,
     operating_initial_state,
@@ -30,6 +31,8 @@ class DashboardLayout:
     lcd_status: gr.Textbox
     clock: gr.Markdown
     timer: gr.Timer
+    camera_timer: gr.Timer
+    gas_banner: gr.HTML
     page_columns: list[gr.Column]
     operating: OperatingPage
     onboarding: OnboardingPage
@@ -70,6 +73,8 @@ def _build_shell() -> DashboardLayout:
                         elem_classes=["lcd-status"],
                     )
 
+            gas_banner = gr.HTML(gas_banner_html(), elem_id="gas-banner")
+
             with gr.Column(elem_id="page-stack"):
                 page_columns: list[gr.Column] = []
 
@@ -94,6 +99,10 @@ def _build_shell() -> DashboardLayout:
                 page_columns.append(debugging_column)
 
     timer = gr.Timer(value=1.0, active=True)
+    # 30 fps camera polling for a minimum-latency FPV feed. The backend serves tiny
+    # downscaled JPEGs cached per frame, so polling above the camera's FPS is cheap
+    # (cache hits) and just minimises how long a fresh frame waits for the next tick.
+    camera_timer = gr.Timer(value=0.033, active=True)
 
     return DashboardLayout(
         nav=nav,
@@ -104,6 +113,8 @@ def _build_shell() -> DashboardLayout:
         lcd_status=lcd_status,
         clock=clock,
         timer=timer,
+        camera_timer=camera_timer,
+        gas_banner=gas_banner,
         page_columns=page_columns,
         operating=operating,
         onboarding=onboarding,
@@ -123,6 +134,24 @@ _RUNTIME_CSS_FIX = """() => {
         '.op-threshold.block, .op-threshold.block.padded { background: transparent !important; border: 0 !important; box-shadow: none !important; padding: 0 !important; }',
     ].join('');
     document.head.appendChild(s);
+}"""
+
+# When a .page-pane column transitions from display:none to visible, Plotly charts
+# inside it have 0-dimension initialisation and render blank. Dispatching a resize
+# event tells Plotly to recalculate dimensions and re-render correctly.
+_PLOTLY_RESIZE_FIX = """() => {
+    const fireResize = () => setTimeout(() => window.dispatchEvent(new Event('resize')), 200);
+    const attach = () => {
+        const panes = document.querySelectorAll('.page-pane');
+        if (!panes.length) { setTimeout(attach, 400); return; }
+        const obs = new MutationObserver(muts => {
+            for (const m of muts) {
+                if (m.target.style.display !== 'none') { fireResize(); return; }
+            }
+        });
+        panes.forEach(p => obs.observe(p, { attributes: true, attributeFilter: ['style'] }));
+    };
+    attach();
 }"""
 
 
@@ -150,4 +179,5 @@ def build_dashboard() -> gr.Blocks:
             show_progress="hidden",
         )
         demo.load(js=_RUNTIME_CSS_FIX)
+        demo.load(js=_PLOTLY_RESIZE_FIX)
     return demo

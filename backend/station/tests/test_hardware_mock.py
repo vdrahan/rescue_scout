@@ -21,8 +21,8 @@ def test_mock_hardware_builds_in_mock_mode():
 
 def test_component_tests_pass():
     hw = _mgr()
-    for component in ("buzzer", "detection_led", "system_led", "gas_sensor",
-                      "temp_humidity", "lcd_display"):
+    for component in ("buzzer", "detection_led", "system_led", "rgb_module",
+                      "rgb_status", "gas_sensor", "temp_humidity", "lcd_display"):
         result = hw.test(component)
         assert result is not None
         assert result["status"] == "passed", result
@@ -41,3 +41,14 @@ def test_sensor_reads_and_actuators_do_not_crash():
     hw.alert()
     hw.write_lcd(["line1", "line2"])
     hw.cleanup()
+
+
+def test_temperature_test_updates_lcd_when_available():
+    hw = _mgr()
+    result = hw.test("temp_humidity")
+    assert result is not None
+    assert result["status"] == "passed"
+
+    lcd_status = next(d for d in hw.status()["devices"] if d["id"] == "lcd")
+    assert lcd_status["value"][0].startswith("Temp:")
+    assert lcd_status["value"][1].startswith("Hum:")
