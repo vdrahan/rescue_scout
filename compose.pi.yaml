@@ -16,12 +16,12 @@ services:
       RTSP_CAMERA_1_URL: ${RTSP_CAMERA_1_URL:-}
       RTSP_CAMERA_2_URL: ${RTSP_CAMERA_2_URL:-}
       CONF_THRESHOLD: ${CONF_THRESHOLD:-0.45}
-      TARGET_FPS: ${TARGET_FPS:-4}
-      IMG_SIZE: ${IMG_SIZE:-160}
+      TARGET_FPS: ${TARGET_FPS:-6}
+      IMG_SIZE: ${IMG_SIZE:-320}
     deploy:
       resources:
         limits:
-          cpus: "2.0"
+          cpus: "3.5"
     devices:
       - "/dev/gpiochip0:/dev/gpiochip0"
       - "/dev/i2c-1:/dev/i2c-1"           
