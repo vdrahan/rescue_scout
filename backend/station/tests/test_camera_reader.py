@@ -194,3 +194,54 @@ def test_annotated_frame_is_not_served_once_it_is_stale():
     time.sleep(0.12)
     stale = Image.open(io.BytesIO(svc.frame_jpeg()))
     assert stale.size == (settings.frame_width, settings.frame_height)  # "no signal" placeholder
+
+
+class _SplitCamera(CameraSource):
+    """Counts full reads (convert) separately from advances (decode only)."""
+
+    def __init__(self, cam_id):
+        super().__init__(cam_id, cam_id, "rtsp")
+        self.reads = 0
+        self.advances = 0
+
+    def read(self):
+        self.reads += 1
+        time.sleep(0.004)
+        return new_scene(16, 12, self.id)
+
+    def advance(self):
+        self.advances += 1
+        time.sleep(0.004)
+        return True
+
+
+def test_standby_camera_stays_live_but_is_converted_rarely():
+    """Converting every frame of the camera nobody is watching cost ~30% of a core
+    and slowed detection from ~4 to ~2.5 fps. A standby camera must still consume
+    every frame (so nothing queues) but only convert a few frames per second."""
+    settings = _mock_settings(camera_read_fps=200.0)
+    mgr = CameraManager(settings)
+    active, standby = _SplitCamera("detection"), _SplitCamera("fpv")
+    mgr._cameras = {"detection": active, "fpv": standby}
+    mgr._active_id = "detection"
+    mgr._caches = {"detection": None, "fpv": None}
+    mgr._seq = {"detection": 0, "fpv": 0}
+
+    reader = CameraReader(mgr, settings)
+    reader.start()
+    try:
+        time.sleep(1.0)
+    finally:
+        reader.stop()
+
+    assert active.reads > 40 and active.advances == 0      # the watched camera: every frame
+    assert standby.advances > 40                            # the other one is still drained
+    assert standby.reads <= 8                               # ...but converted only a few times a second
+    assert standby.reads >= 2
+    assert mgr.read_one("fpv") is not None                  # and its cache is fresh for a switch
+
+
+def test_default_advance_is_a_plain_read():
+    cam = _CountingCamera("detection")
+    assert cam.advance() is True
+    assert cam.reads == 1

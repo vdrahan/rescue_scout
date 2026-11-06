@@ -92,15 +92,23 @@ class _CvCamera(CameraSource):
             log.warning("Camera %s init failed: %s", self.id, self.last_error)
 
     def read(self) -> np.ndarray | None:
+        return self._read(convert=True)[1]
+
+    def advance(self) -> bool:
+        """Decode the next frame to keep the stream live, but skip the BGR->RGB
+        conversion - the costly part, and wasted on a frame nobody will look at."""
+        return self._read(convert=False)[0]
+
+    def _read(self, convert: bool) -> tuple[bool, np.ndarray | None]:
         if self._cap is None:
             if time.monotonic() < self._next_open:
-                return None  # backoff: avoid hammering the camera
+                return False, None  # backoff: avoid hammering the camera
             self._open()
             if self._cap is None:
-                return None
+                return False, None
         try:
             started = time.monotonic()
-            self._cap.grab()
+            grabbed = self._cap.grab()
             waited = time.monotonic() - started >= _CAUGHT_UP_S
             self._fast_grabs = 0 if waited else self._fast_grabs + 1
             if self._fast_grabs >= _BACKLOG_AFTER:
@@ -110,23 +118,25 @@ class _CvCamera(CameraSource):
                     if not self._cap.grab() or time.monotonic() - started >= _CAUGHT_UP_S:
                         break
                 self._fast_grabs = 0
-            ok, frame = self._cap.retrieve()
-            if not ok:
+            frame = None
+            if grabbed and convert:
+                grabbed, frame = self._cap.retrieve()
+            if not grabbed:
                 self.status = "error"
                 self.last_error = "Camera stream stopped or frame could not be read"
                 self._next_open = time.monotonic() + _RECONNECT_DELAY
                 self.close()
-                return None
+                return False, None
             self.status = "ok"
             self.last_error = ""
-            return frame[..., ::-1].copy()  # BGR -> RGB
+            return True, (frame[..., ::-1].copy() if convert else None)  # BGR -> RGB
         except Exception as exc:  # noqa: BLE001
             self.status = "error"
             self.last_error = self._scrub(exc)
             self._next_open = time.monotonic() + _RECONNECT_DELAY
             self.close()
             log.warning("Camera %s read failed: %s", self.id, self.last_error)
-            return None
+            return False, None
 
     def close(self) -> None:
         if self._cap is not None:

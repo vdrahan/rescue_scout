@@ -11,6 +11,12 @@ a camera switch - and the detector, which always reads the detection camera - go
 footage from half a minute ago. Reading continuously and keeping only the newest frame
 leaves nothing to queue. It also isolates cameras: a dead camera that blocks in its
 reconnect attempt no longer stalls the healthy one.
+
+Consuming a frame (decode) is cheap; converting it to RGB for the cache is not. The
+camera on screen is converted every frame, any other camera only a few times a second -
+enough that its cache is fresh the instant you switch to it, and the detection camera
+often enough for the detector. Converting every frame of the camera nobody was
+watching cost ~30% of a core and slowed detection from ~4 to ~2.5 fps.
 """
 
 from __future__ import annotations
@@ -25,12 +31,17 @@ from .manager import CameraManager
 log = get_logger(__name__)
 
 _IDLE_SLEEP = 0.1  # a camera in reconnect backoff returns at once; poll it gently
+_STANDBY_CONVERT_INTERVAL = 0.2  # a camera nobody is watching: ~5 converted frames/s
 
 
 class CameraReader:
     def __init__(self, manager: CameraManager, settings: Settings):
         self._manager = manager
         self._interval = 1.0 / max(1.0, settings.camera_read_fps)
+        # The detector needs ~target_fps frames/s from the detection camera, watched or not.
+        self._inference_interval = min(
+            _STANDBY_CONVERT_INTERVAL, 1.0 / (1.5 * max(1.0, settings.target_fps))
+        )
         self._running = threading.Event()
         self._threads: list[threading.Thread] = []
 
@@ -65,15 +76,22 @@ class CameraReader:
         log.info("CameraReader stopped")
 
     def _loop(self, cam_id: str) -> None:
+        is_inference = cam_id == self._manager.inference_source_id()
+        standby_every = self._inference_interval if is_inference else _STANDBY_CONVERT_INTERVAL
+        last_convert = 0.0
         while self._running.is_set():
             t0 = time.monotonic()
-            frame = None
+            alive = False
             try:
-                frame = self._manager.capture_camera(cam_id)
+                if cam_id == self._manager.active_id or t0 - last_convert >= standby_every:
+                    last_convert = t0
+                    alive = self._manager.capture_camera(cam_id) is not None
+                else:
+                    alive = self._manager.advance_camera(cam_id)
             except Exception as exc:  # noqa: BLE001
                 log.warning("Camera %s capture error: %s", cam_id, exc)
             # A live read blocks until the camera delivers its next frame, which
             # paces the loop; the sleep only matters for mock/failed cameras.
-            wait = (self._interval if frame is not None else _IDLE_SLEEP) - (time.monotonic() - t0)
+            wait = (self._interval if alive else _IDLE_SLEEP) - (time.monotonic() - t0)
             if wait > 0:
                 time.sleep(wait)

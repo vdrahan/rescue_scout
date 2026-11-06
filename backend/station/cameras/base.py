@@ -19,6 +19,13 @@ class CameraSource(abc.ABC):
     def read(self) -> np.ndarray | None:
         """Return the latest frame as an RGB uint8 array, or None on failure."""
 
+    def advance(self) -> bool:
+        """Consume the next frame without handing it out; False if the camera is down.
+
+        A live stream must be read at the rate it is produced or old frames queue up.
+        Sources where converting a frame is costly override this to skip the conversion."""
+        return self.read() is not None
+
     def close(self) -> None:
         return None
 

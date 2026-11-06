@@ -235,6 +235,55 @@ def test_rtsp_read_does_not_drop_frames_on_ordinary_jitter(monkeypatch):
     assert got == list(range(1, 21))
 
 
+class _CountingCapture:
+    def __init__(self):
+        self.grabs = 0
+        self.retrieves = 0
+
+    def isOpened(self):
+        return True
+
+    def set(self, *_):
+        return True
+
+    def grab(self):
+        self.grabs += 1
+        time.sleep(0.02)  # waits for the camera
+        return True
+
+    def retrieve(self):
+        self.retrieves += 1
+        return True, np.zeros((2, 2, 3), dtype=np.uint8)
+
+    def release(self):
+        pass
+
+
+def test_advance_consumes_frames_without_converting_them(monkeypatch):
+    """Decoding every frame keeps the stream live (nothing queues up); converting
+    BGR->RGB is the expensive part and a standby camera rarely needs it."""
+    capture = _CountingCapture()
+    camera = _camera_with(monkeypatch, capture)
+
+    assert [camera.advance() for _ in range(5)] == [True] * 5
+    assert capture.grabs == 5
+    assert capture.retrieves == 0
+    assert camera.status == "ok"
+
+    assert camera.read() is not None  # a real read still converts
+    assert capture.retrieves == 1
+
+
+def test_advance_reports_a_dead_capture(monkeypatch):
+    capture = _CountingCapture()
+    capture.grab = lambda: False
+    camera = _camera_with(monkeypatch, capture)
+    monkeypatch.setattr("station.cameras.rtsp_camera._RECONNECT_DELAY", 60.0)
+
+    assert camera.advance() is False
+    assert camera.status == "error"
+
+
 def test_empty_env_values_fall_back_to_defaults(monkeypatch):
     """`.env.example` leaves TARGET_FPS / IMG_SIZE empty so compose can supply Pi
     defaults; running the station directly must not crash on those blanks."""

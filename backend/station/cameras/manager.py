@@ -124,6 +124,11 @@ class CameraManager:
         """
         return self._capture(cam_id)
 
+    def advance_camera(self, cam_id: str) -> bool:
+        """Consume a frame from a camera without caching it (keeps the stream live)."""
+        cam = self._cameras.get(cam_id)
+        return cam.advance() if cam is not None else False
+
     def _capture(self, cam_id: str) -> np.ndarray | None:
         cam = self._cameras.get(cam_id)
         if cam is None:
