@@ -1,7 +1,7 @@
 """RTSP / USB camera sources backed by OpenCV (imported lazily).
 
-Low-latency RTSP grabbing: every read first drains the frames already queued in
-the capture (old video) and returns only the newest one.
+Low-latency RTSP grabbing: reads normally return every frame as it arrives; if the
+capture falls behind (a stall) it skips the queued old video and jumps to the live frame.
 """
 
 from __future__ import annotations
@@ -42,11 +42,15 @@ def redact_url(url: str) -> str:
 
 _RECONNECT_DELAY = 1.0  # seconds between reconnect attempts after failure
 
-# Frames already queued in the capture are OLD video. read() grabs until a grab has
-# to wait for the camera - meaning we have caught up - and retrieves only that frame.
-# (cv2.CAP_PROP_BUFFERSIZE does nothing for the FFmpeg backend, so we drain ourselves.)
+# A grab that returns at once found its frame already queued; one that takes longer
+# waited on the network for it. Two frames arriving back to back is ordinary Wi-Fi
+# jitter, so a single fast grab must NOT drop anything (that cost a third of the frames:
+# 15 -> 10 fps). A run of consecutive fast grabs means a real backlog of OLD video
+# (after a stall): then read() skips ahead to the live frame.
+# (cv2.CAP_PROP_BUFFERSIZE does nothing for the FFmpeg backend, so we do it ourselves.)
 _CAUGHT_UP_S = 0.015  # a grab slower than this waited on the network for a new frame
-_MAX_DRAIN = 150      # per call; a larger backlog is worked off over a few calls
+_BACKLOG_AFTER = 4    # consecutive fast grabs that mean "frames are queued"
+_MAX_DRAIN = 150      # per skip-ahead; a larger backlog is worked off over a few calls
 
 
 class _CvCamera(CameraSource):
@@ -55,6 +59,7 @@ class _CvCamera(CameraSource):
         self._source = source
         self._cap = None
         self._next_open: float = 0.0  # monotonic timestamp; 0 = open immediately
+        self._fast_grabs = 0          # consecutive grabs that did not wait on the network
         self._open()
 
     def _scrub(self, exc: Exception) -> str:
@@ -76,6 +81,7 @@ class _CvCamera(CameraSource):
                 log.warning("Camera %s could not open source %s", self.id, redact_url(str(self._source)))
                 return
             self._cap = cap
+            self._fast_grabs = 0
             self._next_open = 0.0
             self.status = "ok"
             self.last_error = ""
@@ -93,12 +99,17 @@ class _CvCamera(CameraSource):
             if self._cap is None:
                 return None
         try:
-            for _ in range(_MAX_DRAIN):
-                started = time.monotonic()
-                if not self._cap.grab():
-                    break
-                if time.monotonic() - started >= _CAUGHT_UP_S:
-                    break
+            started = time.monotonic()
+            self._cap.grab()
+            waited = time.monotonic() - started >= _CAUGHT_UP_S
+            self._fast_grabs = 0 if waited else self._fast_grabs + 1
+            if self._fast_grabs >= _BACKLOG_AFTER:
+                # Behind: skip the queued old video, up to the frame the camera just sent.
+                for _ in range(_MAX_DRAIN):
+                    started = time.monotonic()
+                    if not self._cap.grab() or time.monotonic() - started >= _CAUGHT_UP_S:
+                        break
+                self._fast_grabs = 0
             ok, frame = self._cap.retrieve()
             if not ok:
                 self.status = "error"

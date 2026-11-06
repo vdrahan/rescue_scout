@@ -176,19 +176,63 @@ class _BacklogCapture:
         self.released = True
 
 
-def test_rtsp_read_drains_queued_frames_and_returns_the_live_one(monkeypatch):
-    capture = _BacklogCapture(queued=40)
+def _camera_with(monkeypatch, capture):
     fake_cv2 = types.SimpleNamespace(
         CAP_FFMPEG=1900, CAP_PROP_BUFFERSIZE=38, VideoCapture=lambda source, backend: capture
     )
     monkeypatch.setitem(sys.modules, "cv2", fake_cv2)
+    return RtspCamera("fpv", "FPV", "rtsp://example/stream")
 
-    camera = RtspCamera("fpv", "FPV", "rtsp://example/stream")
-    frame = camera.read()
 
-    assert frame is not None
-    assert int(frame[0, 0, 0]) >= 200, "read() returned a frame from the queued backlog, not the live one"
-    assert capture.grabs >= 41
+def test_rtsp_read_skips_a_real_backlog_to_the_live_frame(monkeypatch):
+    """After a stall the capture holds seconds of queued (old) video. read() must
+    jump to the live frame instead of replaying the queue frame by frame."""
+    capture = _BacklogCapture(queued=60)
+    camera = _camera_with(monkeypatch, capture)
+
+    frames = [camera.read() for _ in range(8)]
+
+    assert all(f is not None for f in frames)
+    assert int(frames[-1][0, 0, 0]) >= 200, "still replaying queued video after 8 reads"
+    assert capture.queue == [], "the backlog was not drained"
+
+
+class _BurstyCapture:
+    """Network jitter: frames normally arrive one per grab (grab waits), but every
+    second frame arrives back to back with the previous one (grab returns at once)."""
+
+    def __init__(self):
+        self.n = 0
+        self.current = 0
+
+    def isOpened(self):
+        return True
+
+    def set(self, *_):
+        return True
+
+    def grab(self):
+        self.n += 1
+        if self.n % 2 == 1:
+            time.sleep(0.03)  # waits for the camera
+        self.current = self.n
+        return True
+
+    def retrieve(self):
+        return True, np.full((1, 1, 3), self.current, dtype=np.uint8)
+
+    def release(self):
+        pass
+
+
+def test_rtsp_read_does_not_drop_frames_on_ordinary_jitter(monkeypatch):
+    """Two frames arriving back to back is normal on Wi-Fi, not a backlog. Treating
+    the second one as 'old video' threw away a third of the frames (15 -> 10 fps)."""
+    camera = _camera_with(monkeypatch, _BurstyCapture())
+
+    got = [int(camera.read()[0, 0, 0]) for _ in range(20)]
+
+    assert got == list(range(1, 21))
 
 
 def test_empty_env_values_fall_back_to_defaults(monkeypatch):
