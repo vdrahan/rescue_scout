@@ -17,6 +17,24 @@ HARDWARE_TEST_TIMEOUT = float(os.getenv("FRONTEND_HARDWARE_TEST_TIMEOUT", "8.0")
 # After a failed call, skip that backend for this long (circuit breaker).
 BACKEND_COOLDOWN_SECONDS = float(os.getenv("FRONTEND_BACKEND_COOLDOWN", "5.0"))
 
+_DEFAULT_CAMERA_REFRESH = 0.1
+_MIN_CAMERA_REFRESH = 0.05
+
+
+def camera_refresh_seconds(env) -> float:
+    """Seconds between live-view refreshes (FRONTEND_CAMERA_REFRESH_SECONDS).
+
+    Every refresh is a Gradio event that costs real CPU on the Pi, so the rate is
+    capped at 20 Hz and a bad value falls back to the default (10 Hz)."""
+    try:
+        value = float(env.get("FRONTEND_CAMERA_REFRESH_SECONDS", _DEFAULT_CAMERA_REFRESH))
+    except ValueError:
+        return _DEFAULT_CAMERA_REFRESH
+    return max(_MIN_CAMERA_REFRESH, value)
+
+
+CAMERA_REFRESH_SECONDS = camera_refresh_seconds(os.environ)
+
 # Optional: start station detection once when the dashboard opens.
 AUTO_START_DETECTION = os.getenv("FRONTEND_AUTO_START_DETECTION", "false").lower() in {
     "1",

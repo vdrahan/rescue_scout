@@ -20,6 +20,11 @@ from .pages.onboarding_page import OnboardingPage, build_onboarding_page
 from .pages.operating_page import OperatingPage, build_operating_page
 from .pages.statistics_page import StatisticsPage, build_statistics_page
 
+try:  # package import used by tests and python -m frontend.app
+    from frontend.services.config import CAMERA_REFRESH_SECONDS
+except ModuleNotFoundError:  # script mode: cd frontend then python app.py
+    from services.config import CAMERA_REFRESH_SECONDS
+
 
 @dataclass
 class DashboardLayout:
@@ -99,10 +104,10 @@ def _build_shell() -> DashboardLayout:
                 page_columns.append(debugging_column)
 
     timer = gr.Timer(value=1.0, active=True)
-    # ~15 Hz camera polling: the station serves at most ~15 distinct frames per second
-    # (tiny downscaled JPEGs, cached per frame), so polling faster only repeats frames
-    # and burns CPU the detector needs. Frames are fetched live on every tick.
-    camera_timer = gr.Timer(value=0.066, active=True)
+    # Live-view polling (default 10 Hz, FRONTEND_CAMERA_REFRESH_SECONDS). Each tick is a
+    # Gradio event that costs real CPU on the Pi, and that CPU is shared with the
+    # detector, so this is deliberately not as fast as the camera (~15 fps).
+    camera_timer = gr.Timer(value=CAMERA_REFRESH_SECONDS, active=True)
 
     return DashboardLayout(
         nav=nav,
@@ -156,7 +161,9 @@ _PLOTLY_RESIZE_FIX = """() => {
 
 
 def build_dashboard() -> gr.Blocks:
-    with gr.Blocks(title=APP_TITLE) as demo:
+    # Gradio saves every refreshed camera image as a new file and never removes it
+    # (~2 GB/hour at the live-view rate): sweep files older than 2 minutes every minute.
+    with gr.Blocks(title=APP_TITLE, delete_cache=(60, 120)) as demo:
         layout = _build_shell()
         wire_callbacks(layout)
         demo.load(

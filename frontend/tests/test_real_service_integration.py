@@ -277,5 +277,35 @@ class CameraTransportTests(unittest.TestCase):
         self.assertEqual(page.camera_output.format, "jpeg")
 
 
+class CameraRefreshTests(unittest.TestCase):
+    def test_refresh_interval_defaults_to_ten_hertz(self) -> None:
+        from frontend.services import config
+
+        self.assertEqual(config.camera_refresh_seconds({}), 0.1)
+
+    def test_refresh_interval_comes_from_the_environment(self) -> None:
+        from frontend.services import config
+
+        self.assertEqual(config.camera_refresh_seconds({"FRONTEND_CAMERA_REFRESH_SECONDS": "0.25"}), 0.25)
+
+    def test_refresh_interval_cannot_be_set_dangerously_fast_or_invalid(self) -> None:
+        """Every refresh is a Gradio event; asking for ~0 s would peg the Pi's CPU."""
+        from frontend.services import config
+
+        self.assertEqual(config.camera_refresh_seconds({"FRONTEND_CAMERA_REFRESH_SECONDS": "0"}), 0.05)
+        self.assertEqual(config.camera_refresh_seconds({"FRONTEND_CAMERA_REFRESH_SECONDS": "nonsense"}), 0.1)
+
+
+class FrameCacheTests(unittest.TestCase):
+    def test_dashboard_deletes_old_frame_files(self) -> None:
+        """Gradio saves every refreshed image as a new file and keeps it forever:
+        ~2 GB per hour at the live-view rate, enough to fill the Pi's SD card."""
+        from frontend.ui.dashboard import build_dashboard
+
+        demo = build_dashboard()
+
+        self.assertEqual(demo.delete_cache, (60, 120))
+
+
 if __name__ == "__main__":
     unittest.main()
