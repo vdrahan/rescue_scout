@@ -244,3 +244,6 @@ DESIGN.md
 .lgd-nfy*
 .agents/
 .codex/
+
+# local env backups (hold credentials)
+.env.bak*
