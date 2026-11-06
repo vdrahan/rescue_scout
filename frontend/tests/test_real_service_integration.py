@@ -157,6 +157,8 @@ class HandlerNoMockFallbackTests(unittest.TestCase):
             _, camera_status, *_ = handlers.operating_update(False, "detection", 45)
 
         self.assertIn("Camera Reconnecting", camera_status)
+        # The station no longer replays old frames, so the UI must not promise one.
+        self.assertNotIn("last frame", camera_status)
 
     def test_toggle_ai_does_not_enable_when_station_start_fails(self) -> None:
         with (
@@ -258,6 +260,21 @@ class HandlerNoMockFallbackTests(unittest.TestCase):
             handlers._canonical_class("partially_hidden_person"),
             "partially_visible_person",
         )
+
+
+class CameraTransportTests(unittest.TestCase):
+    def test_live_camera_image_is_sent_as_jpeg(self) -> None:
+        """Gradio re-encodes the image on every refresh. WebP (its default) costs
+        ~50 ms per frame on the Pi, which capped the live view at ~9 fps and loaded
+        the CPU the detector needs; JPEG costs ~3 ms."""
+        import gradio as gr
+
+        from frontend.ui.pages.operating_page import build_operating_page
+
+        with gr.Blocks():
+            page = build_operating_page()
+
+        self.assertEqual(page.camera_output.format, "jpeg")
 
 
 if __name__ == "__main__":

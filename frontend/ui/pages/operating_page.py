@@ -44,6 +44,7 @@ def build_operating_page() -> OperatingPage:
         value=None,
         show_label=False,
         type="pil",
+        format="jpeg",  # Gradio's default WebP costs ~50 ms per frame on the Pi; JPEG ~3 ms
         height=400,
         interactive=False,
         elem_classes=["camera-image", "camera-fullwidth"],
