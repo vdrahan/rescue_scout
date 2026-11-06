@@ -47,6 +47,7 @@ class DetectionService:
         # shared latest state (guarded by _lock)
         self._frame: np.ndarray | None = None
         self._frame_seq = 0
+        self._frame_time = 0.0  # monotonic time the annotated frame was published
         self._jpeg_cache: tuple[int, bytes] | None = None
         self._detections: list[dict] = []
         self._recent: deque[dict] = deque(maxlen=10)
@@ -138,6 +139,7 @@ class DetectionService:
         with self._lock:
             self._frame = result.frame
             self._frame_seq += 1
+            self._frame_time = time.monotonic()
             self._detections = [d.to_dict() for d in result.detections]
         self._hw.signal_detection(bool(result.detections))
 
@@ -257,23 +259,31 @@ class DetectionService:
     def uptime_seconds(self) -> float:
         return 0.0 if self._started_at is None else round(time.time() - self._started_at, 1)
 
+    def _encode(self, frame) -> bytes:
+        # Same size/quality as the plain camera feed: a smaller JPEG encodes, travels
+        # and decodes faster, so the annotated view stays as live as the plain one.
+        s = self._settings
+        return to_jpeg(frame, quality=s.camera_stream_quality, max_width=s.camera_stream_max_width or None)
+
     def frame_jpeg(self) -> bytes:
-        # While running, serve the latest annotated frame (cached per sequence).
+        # While running, serve the latest annotated frame (cached per sequence) - but
+        # never a stale one: if inference stalls, fall through to the live camera frame.
         if self.active:
             with self._lock:
                 frame = self._frame
                 seq = self._frame_seq
                 cache = self._jpeg_cache
-            if frame is not None:
+                age = time.monotonic() - self._frame_time
+            if frame is not None and age <= self._settings.camera_max_frame_age:
                 if cache is not None and cache[0] == seq:
                     return cache[1]
-                data = to_jpeg(frame)
+                data = self._encode(frame)
                 with self._lock:
                     self._jpeg_cache = (seq, data)
                 return data
-        # Stopped (or no frame yet) — serve whatever the CameraReader last cached.
+        # Stopped (or no fresh annotated frame) - serve whatever the readers last cached.
         preview = self._cameras.cached()
         if preview is not None:
-            return to_jpeg(preview)
+            return self._encode(preview)
         return to_jpeg(placeholder(self._settings.frame_width,
                                    self._settings.frame_height, "no signal"))

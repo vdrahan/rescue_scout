@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
+        env_ignore_empty=True,  # "KEY=" in .env means "use the default", not ""
         extra="ignore",
         protected_namespaces=(),
     )
@@ -52,7 +53,10 @@ class Settings(BaseSettings):
     usb_camera_index: int = 0
     frame_width: int = 640
     frame_height: int = 480
-    camera_read_fps: float = 30.0  # upper bound for the CameraReader capture loop (self-paces to the camera's FPS)
+    camera_read_fps: float = 30.0  # upper bound for each camera's capture loop (self-paces to the camera's FPS)
+    # A frame older than this is never served: a stalled or reconnecting camera shows
+    # "no signal" instead of replaying footage from seconds (or minutes) ago.
+    camera_max_frame_age: float = 2.0
     # Live preview feed (FPV / non-AI) is tuned for MINIMUM latency, not quality:
     # decimate to this width and encode at this JPEG quality before sending. Small
     # frames encode in a few ms and transfer/render almost instantly. Set width 0

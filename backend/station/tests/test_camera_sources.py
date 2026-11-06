@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import time
 import types
 
 import numpy as np
@@ -138,3 +139,70 @@ def test_mock_mode_without_rtsp_stays_mock_and_skips_usb(monkeypatch):
     cameras = CameraManager(settings).list()
 
     assert all(c["type"] == "mock" for c in cameras)
+
+
+class _BacklogCapture:
+    """Capture whose first N grabs return instantly (frames already queued in the
+    socket buffer, i.e. OLD video) and later grabs block until a live frame arrives."""
+
+    def __init__(self, queued):
+        self.queue = [f"old-{i}" for i in range(queued)]
+        self.grabs = 0
+        self.live = 0
+        self.current = None
+        self.released = False
+
+    def isOpened(self):
+        return True
+
+    def set(self, *_):
+        return True
+
+    def grab(self):
+        self.grabs += 1
+        if self.queue:
+            self.current = self.queue.pop(0)
+        else:
+            time.sleep(0.03)  # waits for the camera -> we have caught up
+            self.live += 1
+            self.current = f"live-{self.live}"
+        return True
+
+    def retrieve(self):
+        marker = int(self.current.split("-")[1]) + (200 if self.current.startswith("live") else 0)
+        return True, np.full((1, 1, 3), marker, dtype=np.uint8)
+
+    def release(self):
+        self.released = True
+
+
+def test_rtsp_read_drains_queued_frames_and_returns_the_live_one(monkeypatch):
+    capture = _BacklogCapture(queued=40)
+    fake_cv2 = types.SimpleNamespace(
+        CAP_FFMPEG=1900, CAP_PROP_BUFFERSIZE=38, VideoCapture=lambda source, backend: capture
+    )
+    monkeypatch.setitem(sys.modules, "cv2", fake_cv2)
+
+    camera = RtspCamera("fpv", "FPV", "rtsp://example/stream")
+    frame = camera.read()
+
+    assert frame is not None
+    assert int(frame[0, 0, 0]) >= 200, "read() returned a frame from the queued backlog, not the live one"
+    assert capture.grabs >= 41
+
+
+def test_empty_env_values_fall_back_to_defaults(monkeypatch):
+    """`.env.example` leaves TARGET_FPS / IMG_SIZE empty so compose can supply Pi
+    defaults; running the station directly must not crash on those blanks."""
+    monkeypatch.setenv("TARGET_FPS", "")
+    monkeypatch.setenv("IMG_SIZE", "")
+    settings = Settings(_env_file=None)
+    assert settings.target_fps > 0
+    assert settings.img_size > 0
+
+
+def test_tests_never_read_a_local_env_file(tmp_path, monkeypatch):
+    """A developer's real `.env` (with camera URLs) must not leak into the tests."""
+    (tmp_path / ".env").write_text("RTSP_CAMERA_1_URL=rtsp://user:secret@192.0.2.1/stream\n")
+    monkeypatch.chdir(tmp_path)
+    assert Settings().rtsp_camera_1_url == ""

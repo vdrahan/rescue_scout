@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import threading
+import time
 
 import numpy as np
 
@@ -20,6 +21,8 @@ class CameraManager:
         self._settings = settings
         self._lock = threading.Lock()
         self._caches: dict[str, np.ndarray | None] = {}
+        self._stamps: dict[str, float] = {}       # monotonic time each cached frame was captured
+        self._max_age = settings.camera_max_frame_age
         self._seq: dict[str, int] = {}            # bumped on every fresh frame
         self._jpeg_cache: dict[str, tuple] = {}   # cam_id -> (key, jpeg bytes)
         self.degraded = False
@@ -83,6 +86,9 @@ class CameraManager:
     def active_id(self) -> str:
         return self._active_id
 
+    def camera_ids(self) -> list[str]:
+        return list(self._cameras)
+
     def secondary_ids(self) -> list[str]:
         """IDs of all cameras that are not currently active."""
         active = self._active_id
@@ -95,14 +101,13 @@ class CameraManager:
     def read_inference(self) -> np.ndarray | None:
         """Return the latest cached frame from the detection camera (non-blocking)."""
         with self._lock:
-            return self._caches.get("detection")
+            return self._fresh("detection")
 
     def set_active(self, cam_id: str) -> bool:
         if cam_id not in self._cameras:
             return False
         with self._lock:
             self._active_id = cam_id
-            # Keep existing cache — don't blank the screen during the handover
         return True
 
     def capture_active(self) -> np.ndarray | None:
@@ -127,10 +132,11 @@ class CameraManager:
         with self._lock:
             if frame is not None:
                 self._caches[cam_id] = frame
+                self._stamps[cam_id] = time.monotonic()
                 self._seq[cam_id] += 1
-            # On error we intentionally keep the last good frame so the UI
-            # shows a stale image while the camera reconnects rather than
-            # flashing a placeholder "no signal" screen.
+            # On error the last frame stays cached only until camera_max_frame_age
+            # passes (see _fresh): long enough to ride out a dropped packet, short
+            # enough that a dead camera shows "no signal", never old footage.
         return frame
 
     def read_active(self) -> np.ndarray | None:
@@ -140,7 +146,7 @@ class CameraManager:
     def read_one(self, cam_id: str) -> np.ndarray | None:
         """Return the last cached frame for a camera — never blocks."""
         with self._lock:
-            return self._caches.get(cam_id)
+            return self._fresh(cam_id)
 
     def read_one_jpeg(self, cam_id: str, max_width: int | None = None,
                       quality: int = 80) -> bytes | None:
@@ -148,7 +154,7 @@ class CameraManager:
         (the FPV feed refreshes faster than the camera produces frames) never
         re-encode the same image — that redundant work was starving the reader."""
         with self._lock:
-            frame = self._caches.get(cam_id)
+            frame = self._fresh(cam_id)
             seq = self._seq.get(cam_id, 0)
             cached = self._jpeg_cache.get(cam_id)
         if frame is None:
@@ -163,7 +169,18 @@ class CameraManager:
 
     def cached(self) -> np.ndarray | None:
         with self._lock:
-            return self._caches.get(self._active_id)
+            return self._fresh(self._active_id)
+
+    def _fresh(self, cam_id: str) -> np.ndarray | None:
+        """Cached frame for ``cam_id``, or None if missing or older than the age limit.
+
+        Caller holds ``self._lock``."""
+        frame = self._caches.get(cam_id)
+        if frame is None:
+            return None
+        if time.monotonic() - self._stamps.get(cam_id, 0.0) > self._max_age:
+            return None
+        return frame
 
     def close_all(self) -> None:
         for cam in self._cameras.values():

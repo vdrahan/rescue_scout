@@ -1,7 +1,7 @@
 """RTSP / USB camera sources backed by OpenCV (imported lazily).
 
-Low-latency RTSP grabbing mirrors the approach in ``backend/model/model.py``:
-keep the capture buffer tiny and grab a few frames to flush stale ones.
+Low-latency RTSP grabbing: every read first drains the frames already queued in
+the capture (old video) and returns only the newest one.
 """
 
 from __future__ import annotations
@@ -42,11 +42,11 @@ def redact_url(url: str) -> str:
 
 _RECONNECT_DELAY = 1.0  # seconds between reconnect attempts after failure
 
-# Frames to grab before retrieving. The background CameraReader drains the active
-# camera every tick, so 1 grab returns the freshest frame with the lowest latency.
-# Higher values block waiting for N frames at the camera's FPS (e.g. 10 grabs on a
-# 15 fps stream stalls each read ~0.6 s), which throttled the FPV feed badly.
-_GRAB_FLUSH = 1
+# Frames already queued in the capture are OLD video. read() grabs until a grab has
+# to wait for the camera - meaning we have caught up - and retrieves only that frame.
+# (cv2.CAP_PROP_BUFFERSIZE does nothing for the FFmpeg backend, so we drain ourselves.)
+_CAUGHT_UP_S = 0.015  # a grab slower than this waited on the network for a new frame
+_MAX_DRAIN = 150      # per call; a larger backlog is worked off over a few calls
 
 
 class _CvCamera(CameraSource):
@@ -93,8 +93,12 @@ class _CvCamera(CameraSource):
             if self._cap is None:
                 return None
         try:
-            for _ in range(_GRAB_FLUSH):
-                self._cap.grab()
+            for _ in range(_MAX_DRAIN):
+                started = time.monotonic()
+                if not self._cap.grab():
+                    break
+                if time.monotonic() - started >= _CAUGHT_UP_S:
+                    break
             ok, frame = self._cap.retrieve()
             if not ok:
                 self.status = "error"

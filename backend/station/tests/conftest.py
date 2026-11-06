@@ -19,7 +19,14 @@ os.environ.setdefault("SINK_ENABLED", "false")
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
+from station.config import Settings  # noqa: E402
 from station.main import create_app  # noqa: E402
+
+# Tests must never pick up a developer's real `.env` (camera URLs would make "mock"
+# tests open real cameras and take seconds per test) or camera URLs from the shell.
+Settings.model_config["env_file"] = None
+for _name in ("RTSP_CAMERA_1_URL", "RTSP_CAMERA_2_URL"):
+    os.environ.pop(_name, None)
 
 
 @pytest.fixture()

@@ -119,3 +119,78 @@ def test_reader_start_stop_runs_background_thread():
         assert mgr.cached() is not None
     finally:
         reader.stop()
+
+
+class _CountingCamera(CameraSource):
+    """Camera that returns a fresh tiny frame every read and counts the reads."""
+
+    def __init__(self, cam_id):
+        super().__init__(cam_id, cam_id, "rtsp")
+        self.reads = 0
+
+    def read(self):
+        self.reads += 1
+        time.sleep(0.005)
+        return new_scene(16, 12, f"{self.id}-{self.reads}")
+
+
+def test_every_camera_is_read_continuously_not_only_the_active_one():
+    """A standby camera read at a lower rate than the stream produces builds a
+    backlog inside the capture (~30 s of old video), so switching to it shows
+    stale footage. Each camera must be drained at full rate by its own thread."""
+    settings = _mock_settings(camera_read_fps=200.0)
+    mgr = CameraManager(settings)
+    active, standby = _CountingCamera("detection"), _CountingCamera("fpv")
+    mgr._cameras = {"detection": active, "fpv": standby}
+    mgr._active_id = "detection"
+    mgr._caches = {"detection": None, "fpv": None}
+    mgr._seq = {"detection": 0, "fpv": 0}
+
+    reader = CameraReader(mgr, settings)
+    reader.start()
+    try:
+        time.sleep(0.5)
+    finally:
+        reader.stop()
+
+    assert standby.reads > 20
+    assert standby.reads >= 0.6 * active.reads
+
+
+def test_frames_older_than_max_age_are_never_served():
+    settings = _mock_settings(camera_max_frame_age=0.05)
+    mgr = CameraManager(settings)
+    reader = CameraReader(mgr, settings)
+    reader._tick()
+    assert mgr.cached() is not None
+    assert mgr.read_one_jpeg(mgr.active_id) is not None
+
+    time.sleep(0.12)
+
+    assert mgr.cached() is None
+    assert mgr.read_active() is None
+    assert mgr.read_one(mgr.active_id) is None
+    assert mgr.read_inference() is None
+    assert mgr.read_one_jpeg(mgr.active_id) is None
+
+
+def test_annotated_frame_is_not_served_once_it_is_stale():
+    import io
+
+    from PIL import Image
+
+    settings = _mock_settings(camera_max_frame_age=0.05)
+    bundle = build_detector(settings)
+    cams = _FakeCams(None)  # no live camera frame either
+    svc = DetectionService(settings, cams, object(), object(), bundle)
+    svc._running.set()
+    svc._frame = new_scene(64, 48, "old detection")
+    svc._frame_seq = 1
+    svc._frame_time = time.monotonic()
+
+    fresh = Image.open(io.BytesIO(svc.frame_jpeg()))
+    assert fresh.size == (64, 48)  # a fresh annotated frame is served as is
+
+    time.sleep(0.12)
+    stale = Image.open(io.BytesIO(svc.frame_jpeg()))
+    assert stale.size == (settings.frame_width, settings.frame_height)  # "no signal" placeholder
