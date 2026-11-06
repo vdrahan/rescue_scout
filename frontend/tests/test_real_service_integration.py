@@ -297,14 +297,45 @@ class CameraRefreshTests(unittest.TestCase):
 
 
 class FrameCacheTests(unittest.TestCase):
-    def test_dashboard_deletes_old_frame_files(self) -> None:
-        """Gradio saves every refreshed image as a new file and keeps it forever:
-        ~2 GB per hour at the live-view rate, enough to fill the Pi's SD card."""
-        from frontend.ui.dashboard import build_dashboard
+    """Gradio saves every refreshed camera image as a new file and never removes it
+    (Blocks(delete_cache=...) does not track them - verified on the Pi: files kept
+    growing past the limit). At the live-view rate that is ~2 GB/hour, enough to
+    fill the Pi's SD card, so the app sweeps old frames itself."""
 
-        demo = build_dashboard()
+    def _make(self, root: Path, rel: str, age: float) -> Path:
+        import os
+        import time
 
-        self.assertEqual(demo.delete_cache, (60, 120))
+        path = root / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"x")
+        old = time.time() - age
+        os.utime(path, (old, old))
+        return path
+
+    def test_sweep_removes_only_old_live_view_frames(self) -> None:
+        import tempfile
+
+        from frontend.services.frame_cache import sweep
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            old_frame = self._make(root, "aaa/image.jpeg", age=700)
+            new_frame = self._make(root, "bbb/image.jpeg", age=5)
+            old_export = self._make(root, "ccc/report.csv", age=700)
+
+            removed = sweep(root, max_age=600)
+
+            self.assertEqual(removed, 1)
+            self.assertFalse(old_frame.exists())
+            self.assertFalse(old_frame.parent.exists(), "emptied folder should go too")
+            self.assertTrue(new_frame.exists())
+            self.assertTrue(old_export.exists(), "only live-view frames are swept, never exports")
+
+    def test_sweep_survives_a_missing_cache_folder(self) -> None:
+        from frontend.services.frame_cache import sweep
+
+        self.assertEqual(sweep(Path("/nonexistent/gradio-cache"), max_age=60), 0)
 
 
 if __name__ == "__main__":

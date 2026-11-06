@@ -161,9 +161,7 @@ _PLOTLY_RESIZE_FIX = """() => {
 
 
 def build_dashboard() -> gr.Blocks:
-    # Gradio saves every refreshed camera image as a new file and never removes it
-    # (~2 GB/hour at the live-view rate): sweep files older than 2 minutes every minute.
-    with gr.Blocks(title=APP_TITLE, delete_cache=(60, 120)) as demo:
+    with gr.Blocks(title=APP_TITLE) as demo:
         layout = _build_shell()
         wire_callbacks(layout)
         demo.load(
